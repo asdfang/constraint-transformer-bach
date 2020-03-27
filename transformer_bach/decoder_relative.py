@@ -1,10 +1,11 @@
-import os
+import os, sys
 from datetime import datetime
 from itertools import islice
+import music21
 
 import numpy as np
 import torch
-from transformer_bach.DatasetManager.helpers import PAD_SYMBOL, START_SYMBOL, END_SYMBOL
+from transformer_bach.DatasetManager.helpers import PAD_SYMBOL, START_SYMBOL, END_SYMBOL, standard_name, standard_note
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -450,28 +451,35 @@ class TransformerBach(nn.Module):
 
         return scores
 
-    def generate(self, temperature=1,
+    def generate(self, 
+                 temperature=1,
                  top_p=1,
                  batch_size=1,
                  melody_constraint=None,
                  hard_constraint=False):
+        """
+        temperature: 
+        top_p: parameter for top p sampling
+        batch_size: number of generations
+        melody_constraint: soprano line
+        hard_constraint: whether constraint is false
+        """
         self.eval()
         if melody_constraint is not None:
             num_events = len(melody_constraint)
         else:
             num_events = self.data_processor.num_events * 4
-        # num_events = self.data_processor.num_events
+
         num_start_index = 4
         with torch.no_grad():
+            num_events = num_events + 2 * num_start_index
             x, masked_positions = self.init_generation_chorale(
-                num_events=num_events + 2 * num_start_index,
+                num_events=num_events,
                 start_index=num_start_index,
                 melody_constraint=melody_constraint)
-
             # Duplicate along batch dimension
             x = x.repeat(batch_size, 1, 1)
             masked_positions = masked_positions.repeat(batch_size, 1, 1)
-
             for event_index in range(num_events):
                 for channel_index in range(self.num_channels):
                     # slice x
@@ -481,10 +489,10 @@ class TransformerBach(nn.Module):
                         num_blocks_model=self.num_tokens_target // (self.num_events_grouped
                                                                     * self.num_channels)
                     )
+
                     event_begin = t_begin * self.num_events_grouped
                     event_end = t_end * self.num_events_grouped
-                    event_relative = (t_relative * self.num_events_grouped
-                                      + event_index % self.num_events_grouped)
+                    event_relative = (t_relative * self.num_events_grouped + event_index % self.num_events_grouped)
 
                     x_slice = x[:, event_begin: event_end]
                     masked_positions_slice = masked_positions[:, event_begin: event_end]
@@ -504,33 +512,32 @@ class TransformerBach(nn.Module):
                                          dim=0)
                     p = torch.softmax(logits, dim=1)
                     p = to_numpy(p)
+
                     # update generated sequence
                     for batch_index in range(batch_size):
-                        new_pitch_index = np.random.choice(np.arange(
-                            self.num_tokens_per_channel[channel_index]
-                        ), p=p[batch_index])
+                        new_pitch_index = np.random.choice(np.arange(self.num_tokens_per_channel[channel_index]), 
+                                                                     p=p[batch_index])
 
                         # only if not constrained
-                        if not (hard_constraint
-                                and
-                                masked_positions[batch_index,
-                                                 event_index, channel_index] == 0):
-                            x[batch_index,
-                              event_index,
-                              channel_index] = int(new_pitch_index)
+                        if not (hard_constraint and masked_positions[batch_index, event_index, channel_index] == 0):
+                            x[batch_index, event_index, channel_index] = int(new_pitch_index)
 
         # to score
-        tensor_score = self.data_processor.postprocess(
-            x.cpu().split(1, 0))
+        x = x[:, num_start_index:-num_start_index, :]                               # remove padding
+        tensor_score = self.data_processor.postprocess(x.cpu().split(1, 0))         # convert from tensor to numpy array
         scores = self.dataloader_generator.to_score(tensor_score)
 
+        for score in scores:
+            self.trim_generated_chorale(score)
+
         # save scores in model_dir
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
         if not os.path.exists(f'{self.model_dir}/generations'):
             os.mkdir(f'{self.model_dir}/generations')
 
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        
         for k, score in enumerate(scores):
-            score.write('xml', f'{self.model_dir}/generations/{timestamp}_{k}.xml')
+            score.write('midi', f'{self.model_dir}/generations/{timestamp}_{k}.mid')
 
         return scores
 
@@ -539,12 +546,9 @@ class TransformerBach(nn.Module):
         START = [d[START_SYMBOL] for d in self.dataloader_generator.dataset.note2index_dicts]
         END = [d[END_SYMBOL] for d in self.dataloader_generator.dataset.note2index_dicts]
         aa = torch.Tensor(PAD).unsqueeze(0).unsqueeze(0).repeat(1, start_index - 1, 1).long()
-        bb = torch.Tensor(START).unsqueeze(0).unsqueeze(0).long().repeat(1, num_events - 2 *
-                                                                         start_index + 1,
-                                                                         1).long()
+        bb = torch.Tensor(START).unsqueeze(0).unsqueeze(0).long().repeat(1, num_events - 2 * start_index + 1, 1).long()
         cc = torch.Tensor(END).unsqueeze(0).unsqueeze(0).long()
-        dd = torch.Tensor(PAD).unsqueeze(0).unsqueeze(0).repeat(1, start_index - 1,
-                                                                1).long()
+        dd = torch.Tensor(PAD).unsqueeze(0).unsqueeze(0).repeat(1, start_index - 1, 1).long()
         init_sequence = torch.cat([aa, bb, cc, dd], 1)
 
         masked_positions = torch.ones_like(init_sequence)
@@ -559,6 +563,19 @@ class TransformerBach(nn.Module):
                 masked_positions[:, i + start_index, 0] = 0
         return cuda_variable(init_sequence), cuda_variable(masked_positions)
 
+    def trim_generated_chorale(self, score):
+        """
+        :return: score with everything after and including the END token trimmed in place
+        """
+        for part in score.parts:
+            found = music21.search.noteNameSearch(part, [standard_note(END_SYMBOL)])   # look for end note
+            assert len(found) in [0, 1] and part.isSorted  # either there's exactly one end note, or none
+            if found:
+                end_idx = found[0]
+                num_pops = len(part) - end_idx      # total number of notes to 
+                for _ in range(num_pops):
+                    part.pop(end_idx)
+                    
     def compute_start_end_times(self, t, num_blocks, num_blocks_model):
         """
 
