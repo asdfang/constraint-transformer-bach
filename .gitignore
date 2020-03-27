@@ -10,6 +10,7 @@ cortex_key.pub
 plots/*
 generations/**
 models/**
+data/**
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
