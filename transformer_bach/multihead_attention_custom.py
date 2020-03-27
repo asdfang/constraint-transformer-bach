@@ -8,7 +8,8 @@ from transformer_bach.relative_attention import RelativeAttention
 
 
 class MultiheadAttentionCustom(nn.Module):
-    r"""Allows the model to jointly attend to information
+    r"""
+    Allows the model to jointly attend to information
     from different representation subspaces.
     See reference: Attention Is All You Need
 

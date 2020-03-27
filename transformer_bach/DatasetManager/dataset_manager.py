@@ -1,18 +1,16 @@
 import os
-
-# Basically, all you have to do to use an existing dataset is to
-# add an entry in the all_datasets variable
-# and specify its base class and which music21 objects it uses
-# by giving an iterator over music21 scores
 import torch
 
 from transformer_bach.DatasetManager.music_dataset import MusicDataset
 from transformer_bach.all_datasets import get_all_datasets
 
+# to use an existing dataset, add an entry in the all_datasets variable
+# and specify its base class and which music21 objects it uses
+# by giving an iterator over music21 scores
 
 class DatasetManager:
     def __init__(self):
-        self.cache_dir = f'{os.path.expanduser("~")}/Data/dataset_cache'
+        self.cache_dir = f'{os.path.expanduser("~")}/transformer-bach/data/dataset_cache'
         # create cache dir if it doesn't exist
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)

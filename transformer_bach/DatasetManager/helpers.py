@@ -4,7 +4,7 @@ from music21 import note, harmony, expressions
 from torch.utils.data import TensorDataset
 
 # constants
-SLUR_SYMBOL = '__'
+SLUR_SYMBOL = '__'          # hold symbol
 START_SYMBOL = 'START'
 END_SYMBOL = 'END'
 REST_SYMBOL = 'rest'
@@ -24,8 +24,9 @@ MAX_VELOCITY = 128
 def standard_name(note_or_rest, voice_range=None):
     """
     Convert music21 objects to str
-    :param note_or_rest:
-    :return:
+    :param note_or_rest: one of music21.note.Note, music21.note.Rest, str, music21.harmony.ChordSymbol, or music21.expressions.TextExpression object
+    
+    :return: string representation of note or rest
     """
     if isinstance(note_or_rest, note.Note):
         if voice_range is not None:
@@ -46,6 +47,11 @@ def standard_name(note_or_rest, voice_range=None):
 
 
 def standard_note(note_or_rest_string):
+    """
+    :param note_or_rest_string: string representation of note or rest
+
+    :return: music21.note.Note object
+    """
     if note_or_rest_string == 'rest':
         return note.Rest()
     # treat other additional symbols as rests

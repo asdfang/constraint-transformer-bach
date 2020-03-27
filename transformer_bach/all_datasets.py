@@ -6,7 +6,6 @@ from transformer_bach.DatasetManager.helpers import ShortChoraleIteratorGen
 
 def get_all_datasets():
     return {
-
         'bach_chorales':
             {
                 'dataset_class_name': ChoraleDataset,
@@ -27,5 +26,4 @@ def get_all_datasets():
                 'dataset_class_name': ChoraleDataset,
                 'corpus_it_gen':      ShortChoraleIteratorGen()
             },
-
     }

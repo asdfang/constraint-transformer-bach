@@ -1,7 +1,6 @@
 class DataloaderGenerator:
     """
-    Base abstract class for data loader generators
-    dataloaders
+    Base abstract class for data loader generators dataloaders
     """
     def __init__(self, dataset):
         self.dataset = dataset
