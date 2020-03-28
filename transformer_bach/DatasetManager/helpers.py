@@ -1,4 +1,6 @@
 from itertools import islice
+import os
+import pickle
 import music21
 from music21 import note, harmony, expressions
 from torch.utils.data import TensorDataset
@@ -95,3 +97,32 @@ class TensorDatasetIndexed(TensorDataset):
     def __getitem__(self, index):
         ret = super().__getitem__(index)
         return ret, index
+
+
+def load_or_pickle_distributions(dataset):
+    distributions_file = 'Grader/pickles/bach_distributions.txt'
+    error_note_ratio_file = 'Grader/pickles/error_note_ratio.txt'
+    parallel_error_note_ratio_file = 'Grader/pickles/parallel_error_note_ratio.txt'
+    gaussian_file = 'Grader/pickles/gaussian.txt'
+
+    if os.path.exists(distributions_file) and os.path.exists(error_note_ratio_file) and os.path.exists(
+            parallel_error_note_ratio_file) and os.path.exists(gaussian_file):
+        print('Loading Bach chorale distributions')
+        with open(distributions_file, 'rb') as fin:
+            dataset.distributions = pickle.load(fin)
+        with open(error_note_ratio_file, 'rb') as fin:
+            dataset.error_note_ratio = pickle.load(fin)
+        with open(parallel_error_note_ratio_file, 'rb') as fin:
+            dataset.parallel_error_note_ratio = pickle.load(fin)
+        with open(gaussian_file, 'rb') as fin:
+            dataset.gaussian = pickle.load(fin)
+    else:
+        dataset.calculate_distributions()
+        with open(distributions_file, 'wb') as fo:
+            pickle.dump(dataset.distributions, fo)
+        with open(error_note_ratio_file, 'wb') as fo:
+            pickle.dump(dataset.error_note_ratio, fo)
+        with open(parallel_error_note_ratio_file, 'wb') as fo:
+            pickle.dump(dataset.parallel_error_note_ratio, fo)
+        with open(gaussian_file, 'wb') as fo:
+            pickle.dump(dataset.gaussian, fo)
