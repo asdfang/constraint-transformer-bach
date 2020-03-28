@@ -111,12 +111,8 @@ def find_parallel_8ve_5th_errors(chorale):
                 if (has_fermata(top_n1) or has_fermata(bottom_n1)) == False:
                     if vlq.parallelUnisonOrOctave():
                         error_histogram['Prl-8ve'] += 1
-                        print(top_n1.offset)
-                        chorale.show()
                     if vlq.parallelFifth():
                         error_histogram['Prl-5th'] += 1
-                        print(top_n1.offset)
-                        chorale.show()
 
     return error_histogram
 
