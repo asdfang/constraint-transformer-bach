@@ -10,6 +10,7 @@ metadatas = [
     TickMetadata(subdivision=subdivision),
     KeyMetadata()
 ]
+include_transpositions = False
 
 
 class BachDataloaderGenerator(DataloaderGenerator):
@@ -21,6 +22,7 @@ class BachDataloaderGenerator(DataloaderGenerator):
             'metadatas':      metadatas,
             'sequences_size': sequences_size,
             'subdivision':    subdivision,
+            'include_transpositions':   include_transpositions,
         }
 
         dataset: ChoraleBeatsDataset = dataset_manager.get_dataset(

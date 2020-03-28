@@ -13,12 +13,14 @@ class MusicDataset(ABC):
     Must return
     """
 
-    def __init__(self):
+    def __init__(self, include_transpositions):
         self.tensor_dataset = None
+        self.include_transpositions = include_transpositions
 
     @property
     def cache_dir(self):
-        cache_dir = f'{os.path.expanduser("~")}/transformer-bach/data/dataset_cache'
+        folder = 'with_transpositions' if self.include_transpositions else 'without_transpositions'
+        cache_dir = f'{os.path.expanduser("~")}/transformer-bach/data/{folder}/dataset_cache'
         return cache_dir
 
     @abstractmethod
