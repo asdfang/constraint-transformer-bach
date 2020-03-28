@@ -5,7 +5,7 @@ functions for computing the distribution for a given chorale
 from collections import Counter
 import music21
 
-from grader.voice_leading_helpers import *
+from Grader.voice_leading_helpers import *
 
 
 def get_note_histogram(chorale, key):

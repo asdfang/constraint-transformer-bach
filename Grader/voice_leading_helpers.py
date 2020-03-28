@@ -5,6 +5,18 @@ helper functions for grader.get_scores.get_error_score()
 import music21
 from collections import Counter
 
+def has_fermata(note_or_rest):
+    """
+    Arguments
+        note_or_rest: music21.Note
+
+    returns True if the note or rest has a fermata on it
+    """
+    for expr in note_or_rest.expressions:
+        if expr.isClassOrSubclass([music21.expressions.Fermata]):
+            return True
+    return False
+
 
 # TODO for Alex: provide verbose version that tells where the error is (voice, measure, beat)
 def find_voice_leading_errors(chorale):
@@ -12,7 +24,7 @@ def find_voice_leading_errors(chorale):
     Arguments
         chorale: a music21 Stream object; must have 4 parts
 
-    Returns how many hidden octave and fifth, and voice overlap errors there are
+    Returns how many hidden octave and fifth, and voice overlap errors there are. Hidden octave and fifths ignored if first notes have fermata.
         Counter
     """
 
@@ -46,21 +58,23 @@ def find_voice_leading_errors(chorale):
                 # find voice leading mistakes!
                 vlq = music21.voiceLeading.VoiceLeadingQuartet(top_n1, top_n2, bottom_n1, bottom_n2)
 
-                if vlq.hiddenOctave():
-                    error_histogram['H-8ve'] += 1
-                if vlq.hiddenFifth():
-                    error_histogram['H-5th'] += 1
+                if (has_fermata(top_n1) or has_fermata(bottom_n1)) == False:
+                    if vlq.hiddenOctave():
+                        error_histogram['H-8ve'] += 1
+                    if vlq.hiddenFifth():
+                        error_histogram['H-5th'] += 1
                 if vlq.voiceOverlap():
                     error_histogram['Overlap'] += 1
 
     return error_histogram
+
 
 def find_parallel_8ve_5th_errors(chorale):
     """
     Arguments
         chorale: a music21 Stream object; must have 4 parts
 
-    Returns how many parallel octave and fifth errors there are
+    Returns how many parallel octave and fifth errors there are. Parallel octave and fifths ignored if first notes have fermata.
         Counter
     """
 
@@ -94,10 +108,15 @@ def find_parallel_8ve_5th_errors(chorale):
                 # find voice leading mistakes!
                 vlq = music21.voiceLeading.VoiceLeadingQuartet(top_n1, top_n2, bottom_n1, bottom_n2)
 
-                if vlq.parallelUnisonOrOctave():
-                    error_histogram['Prl-8ve'] += 1
-                if vlq.parallelFifth():
-                    error_histogram['Prl-5th'] += 1
+                if (has_fermata(top_n1) or has_fermata(bottom_n1)) == False:
+                    if vlq.parallelUnisonOrOctave():
+                        error_histogram['Prl-8ve'] += 1
+                        print(top_n1.offset)
+                        chorale.show()
+                    if vlq.parallelFifth():
+                        error_histogram['Prl-5th'] += 1
+                        print(top_n1.offset)
+                        chorale.show()
 
     return error_histogram
 
