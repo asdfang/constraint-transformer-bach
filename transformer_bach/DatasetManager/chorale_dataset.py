@@ -5,14 +5,18 @@ import music21
 import torch
 import numpy as np
 
+from collections import Counter
 from music21 import interval, stream
 from torch.utils.data import TensorDataset
 from tqdm import tqdm
+from sklearn.mixture import GaussianMixture
 
 from transformer_bach.DatasetManager.helpers import standard_name, SLUR_SYMBOL, START_SYMBOL, END_SYMBOL, \
     standard_note, OUT_OF_RANGE, REST_SYMBOL, PAD_SYMBOL
-
 from transformer_bach.DatasetManager.music_dataset import MusicDataset
+from Grader.compute_chorale_histograms import *	
+from Grader.distribution_helpers import *	
+from Grader.grader import Grader, FEATURES
 
 
 class ChoraleDataset(MusicDataset):
@@ -26,7 +30,8 @@ class ChoraleDataset(MusicDataset):
                  voice_ids,
                  metadatas=None,
                  sequences_size=8,
-                 subdivision=4):
+                 subdivision=4,
+                 include_transpositions=False):
         """
         :param corpus_it_gen: calling this function returns an iterator
         over chorales (as music21 scores)
@@ -36,7 +41,7 @@ class ChoraleDataset(MusicDataset):
         :param sequences_size: in beats
         :param subdivision: number of sixteenth notes per beat
         """
-        super(ChoraleDataset, self).__init__()
+        super(ChoraleDataset, self).__init__(include_transpositions=include_transpositions)
         self.voice_ids = voice_ids
         self.num_voices = len(voice_ids)
         self.name = name
@@ -49,6 +54,10 @@ class ChoraleDataset(MusicDataset):
         self.subdivision = subdivision
         self.list_symbol_except_notes = [SLUR_SYMBOL, START_SYMBOL, END_SYMBOL, OUT_OF_RANGE,
                                          REST_SYMBOL, PAD_SYMBOL]
+        self.distributions = None	
+        self.error_note_ratio = None	
+        self.parallel_error_note_ratio = None	
+        self.gaussian = None
 
     def __repr__(self):
         return f'ChoraleDataset(' \
@@ -59,19 +68,15 @@ class ChoraleDataset(MusicDataset):
                f'{self.subdivision})'
 
     def iterator_gen(self):
-        return (chorale
-                for chorale in self.corpus_it_gen()
-                if self.is_valid(chorale)
-                )
+        return (chorale for chorale in self.corpus_it_gen() if self.is_valid(chorale))
 
-    def make_tensor_dataset(self):
+    def make_tensor_dataset(self, include_transpositions=False):
         """
         Implementation of the make_tensor_dataset abstract base class
         """
-        index_dict_dir = os.path.join(self.cache_dir,
-                                      f'index_dicts')
-        index_dict_path = os.path.join(index_dict_dir,
-                                       f'{self.name}.pkl')
+        index_dict_dir = os.path.join(self.cache_dir, f'index_dicts')
+        index_dict_path = os.path.join(index_dict_dir, f'{self.name}.pkl')
+        
         # Compute or load index dict
         # input "index" to use this dataset as a reference
         # input "y" to first compute the standardized dataset
@@ -91,7 +96,8 @@ class ChoraleDataset(MusicDataset):
                     voice_ids=self.voice_ids,
                     metadatas=None,
                     sequences_size=1,
-                    subdivision=4)
+                    subdivision=4,
+                    include_transpositions=include_transpositions)
                 smallest_bach_dataset.make_tensor_dataset()
                 index_dicts = {
                     'index2note_dicts': smallest_bach_dataset.index2note_dicts,
@@ -122,28 +128,27 @@ class ChoraleDataset(MusicDataset):
         chorale_tensor_dataset = []
         metadata_tensor_dataset = []
         for chorale_id, chorale in tqdm(enumerate(self.iterator_gen())):
-
             # precompute all possible transpositions and corresponding metadatas
             chorale_transpositions = {}
             metadatas_transpositions = {}
 
             # main loop
-            for offsetStart in np.arange(
-                    chorale.flat.lowestOffset -
-                    (self.sequences_size - one_tick),
-                    chorale.flat.highestOffset,
-                    one_tick):
+            for offsetStart in np.arange(chorale.flat.lowestOffset - (self.sequences_size - one_tick),
+                                         chorale.flat.highestOffset,
+                                         one_tick):
                 offsetEnd = offsetStart + self.sequences_size
-                current_subseq_ranges = self.voice_range_in_subsequence(
-                    chorale,
-                    offsetStart=offsetStart,
-                    offsetEnd=offsetEnd)
+                current_subseq_ranges = self.voice_range_in_subsequence(chorale,
+                                                                        offsetStart=offsetStart,
+                                                                        offsetEnd=offsetEnd)
 
-                transposition = self.min_max_transposition(current_subseq_ranges)
-                min_transposition_subsequence, max_transposition_subsequence = transposition
+                if include_transpositions:
+                    transposition = self.min_max_transposition(current_subseq_ranges)
+                    min_transposition_subsequence, max_transposition_subsequence = transposition
+                    transpositions = range(min_transposition_subsequence, max_transposition_subsequence + 1)
+                else:
+                    transpositions = range(1)
 
-                for semi_tone in range(min_transposition_subsequence,
-                                       max_transposition_subsequence + 1):
+                for semi_tone in transpositions:
                     start_tick = int(offsetStart * self.subdivision)
                     end_tick = int(offsetEnd * self.subdivision)
 
@@ -183,8 +188,7 @@ class ChoraleDataset(MusicDataset):
         chorale_tensor_dataset = torch.cat(chorale_tensor_dataset, 0)
         metadata_tensor_dataset = torch.cat(metadata_tensor_dataset, 0)
 
-        dataset = TensorDataset(chorale_tensor_dataset,
-                                metadata_tensor_dataset)
+        dataset = TensorDataset(chorale_tensor_dataset, metadata_tensor_dataset)
 
         print(f'Sizes: {chorale_tensor_dataset.size()}, {metadata_tensor_dataset.size()}')
         return dataset
@@ -199,16 +203,13 @@ class ChoraleDataset(MusicDataset):
         """
         # transpose
         # compute the most "natural" interval given a number of semi-tones
-        interval_type, interval_nature = interval.convertSemitoneToSpecifierGeneric(
-            semi_tone)
-        transposition_interval = interval.Interval(
-            str(interval_nature) + interval_type)
+        interval_type, interval_nature = interval.convertSemitoneToSpecifierGeneric(semi_tone)
+        transposition_interval = interval.Interval(str(interval_nature) + interval_type)
 
         chorale_tranposed = score.transpose(transposition_interval)
-        chorale_tensor = self.get_score_tensor(
-            chorale_tranposed,
-            offsetStart=0.,
-            offsetEnd=chorale_tranposed.flat.highestTime)
+        chorale_tensor = self.get_score_tensor(chorale_tranposed,
+                                               offsetStart=0.,
+                                               offsetEnd=chorale_tranposed.flat.highestTime)
         metadatas_transposed = self.get_metadata_tensor(chorale_tranposed)
         return chorale_tensor, metadatas_transposed
 
@@ -224,9 +225,7 @@ class ChoraleDataset(MusicDataset):
                 sequence_metadata = torch.from_numpy(
                     metadata.evaluate(score, self.subdivision)).long().clone()
                 square_metadata = sequence_metadata.repeat(self.num_voices, 1)
-                md.append(
-                    square_metadata[:, :, None]
-                )
+                md.append(square_metadata[:, :, None])
         chorale_length = int(score.duration.quarterLength * self.subdivision)
 
         # add voice indexes
@@ -268,9 +267,8 @@ class ChoraleDataset(MusicDataset):
             # there is no note in one part
             transposition = (0, 0)  # min and max transpositions
         else:
-            transpositions = [
-                (min_pitch_corpus - min_pitch_current,
-                 max_pitch_corpus - max_pitch_current)
+            transpositions = [(min_pitch_corpus - min_pitch_current,
+                               max_pitch_corpus - max_pitch_current)
                 for ((min_pitch_corpus, max_pitch_corpus),
                      (min_pitch_current, max_pitch_current))
                 in zip(self.voice_ranges, current_subseq_ranges)
@@ -559,13 +557,10 @@ class ChoraleDataset(MusicDataset):
         """
         slur_indexes = [note2index[SLUR_SYMBOL]
                         for note2index in self.note2index_dicts]
-
         score = music21.stream.Score()
-        for voice_index, (voice, index2note, slur_index) in enumerate(
-                zip(tensor_score,
-                    self.index2note_dicts,
-                    slur_indexes)):
-
+        for voice_index, (voice, index2note, slur_index) in enumerate(zip(tensor_score,
+                                                                          self.index2note_dicts,
+                                                                          slur_indexes)):
             part = stream.Part(id='part' + str(voice_index))
             music21_instrument = music21.instrument.Piano()
             part.insert(0, music21_instrument)
@@ -573,12 +568,11 @@ class ChoraleDataset(MusicDataset):
             f = music21.note.Rest()
             for note_index in [n.item() for n in voice]:
                 # if it is a played note
-                if not note_index == slur_indexes[voice_index]:
+                if not note_index == slur_index:
                     # add previous note
                     if dur > 0:
                         f.duration = music21.duration.Duration(dur / self.subdivision)
                         part.append(f)
-
                     dur = 1
                     f = standard_note(index2note[note_index])
                 else:
@@ -586,8 +580,139 @@ class ChoraleDataset(MusicDataset):
             # add last note
             f.duration = music21.duration.Duration(dur / self.subdivision)
             part.append(f)
+            # add part to score
             score.insert(part)
         return score
+    
+    def calculate_distributions(self):
+        print('Calculating ground-truth distributions over Bach chorales')
+
+        major_nh = Counter()            # notes (for chorales in major)
+        minor_nh = Counter()            # notes (for chorales in minor)
+        rh = Counter()                  # rhythm
+        major_hqh = Counter()           # harmonic quality
+        minor_hqh = Counter()
+        major_directed_ih = Counter()         # directed intervals for whole chorale
+        minor_directed_ih = Counter()
+        major_S_directed_ih = Counter()       # ... for soprano
+        minor_S_directed_ih = Counter()
+        major_A_directed_ih = Counter()       # ... for alto
+        minor_A_directed_ih = Counter()
+        major_T_directed_ih = Counter()       # ... for tenor
+        minor_T_directed_ih = Counter()
+        major_B_directed_ih = Counter()       # ... for bass
+        minor_B_directed_ih = Counter()
+        major_undirected_ih = Counter()       # undirected intervals for whole chorale
+        minor_undirected_ih = Counter()
+        major_S_undirected_ih = Counter()     # ... for soprano
+        minor_S_undirected_ih = Counter()
+        major_A_undirected_ih = Counter()     # ... for alto
+        minor_A_undirected_ih = Counter()
+        major_T_undirected_ih = Counter()     # ... for tenor
+        minor_T_undirected_ih = Counter()
+        major_B_undirected_ih = Counter()     # ... for bass
+        minor_B_undirected_ih = Counter()
+        eh = Counter()                  # errors (not including parallelism)
+        peh = Counter()                 # parallel errors (octaves and fifths)
+        num_notes = 0                   # number of notes
+
+        for chorale in tqdm(self.iterator_gen()):
+            key = chorale.analyze('key')
+            chorale_nh = get_note_histogram(chorale, key)
+            if key.mode == 'major':
+                # note histogram
+                major_nh += chorale_nh
+                # harmonic quality histogram
+                major_hqh += get_harmonic_quality_histogram(chorale)
+                # interval histograms
+                major_directed_ih += get_interval_histogram(chorale, directed=True)
+                major_S_directed_ih += get_SATB_interval_histogram(chorale, voice=0, directed=True)
+                major_A_directed_ih += get_SATB_interval_histogram(chorale, voice=1, directed=True)
+                major_T_directed_ih += get_SATB_interval_histogram(chorale, voice=2, directed=True)
+                major_B_directed_ih += get_SATB_interval_histogram(chorale, voice=3, directed=True)
+                major_undirected_ih += get_interval_histogram(chorale, directed=False)
+                major_S_undirected_ih += get_SATB_interval_histogram(chorale, voice=0, directed=False)
+                major_A_undirected_ih += get_SATB_interval_histogram(chorale, voice=1, directed=False)
+                major_T_undirected_ih += get_SATB_interval_histogram(chorale, voice=2, directed=False)
+                major_B_undirected_ih += get_SATB_interval_histogram(chorale, voice=3, directed=False)
+            else:
+                # note histogram
+                minor_nh += chorale_nh
+                # harmonic quality histogram
+                minor_hqh += get_harmonic_quality_histogram(chorale)
+                # interval histograms
+                minor_directed_ih += get_interval_histogram(chorale, directed=True)
+                minor_S_directed_ih += get_SATB_interval_histogram(chorale, voice=0, directed=True)
+                minor_A_directed_ih += get_SATB_interval_histogram(chorale, voice=1, directed=True)
+                minor_T_directed_ih += get_SATB_interval_histogram(chorale, voice=2, directed=True)
+                minor_B_directed_ih += get_SATB_interval_histogram(chorale, voice=3, directed=True)
+                minor_undirected_ih += get_interval_histogram(chorale, directed=False)
+                minor_S_undirected_ih += get_SATB_interval_histogram(chorale, voice=0, directed=False)
+                minor_A_undirected_ih += get_SATB_interval_histogram(chorale, voice=1, directed=False)
+                minor_T_undirected_ih += get_SATB_interval_histogram(chorale, voice=2, directed=False)
+                minor_B_undirected_ih += get_SATB_interval_histogram(chorale, voice=3, directed=False)
+
+            # rhythm histogram
+            rh += get_rhythm_histogram(chorale)
+            
+            # error histogram
+            eh += get_error_histogram(chorale, self.voice_ranges)
+            # parallel error histogram
+            peh += get_parallel_error_histogram(chorale)
+            # number of notes
+            num_notes += len(chorale.flat.notes)
+
+        # proportion of errors to notes
+        error_note_ratio = sum(eh.values()) / num_notes
+
+        # proportion of parallel errors to notes
+        parallel_error_note_ratio = sum(peh.values()) / num_notes
+
+        # convert histograms to distributions by normalizing
+        distributions = {'major_note_distribution': major_nh,
+                         'minor_note_distribution': minor_nh,
+                         'rhythm_distribution': rh,
+                         'major_harmonic_quality_distribution': major_hqh,
+                         'minor_harmonic_quality_distribution': minor_hqh,
+                         'major_directed_interval_distribution': major_directed_ih,
+                         'minor_directed_interval_distribution': minor_directed_ih,
+                         'major_S_directed_interval_distribution': major_S_directed_ih,
+                         'minor_S_directed_interval_distribution': minor_S_directed_ih,
+                         'major_A_directed_interval_distribution': major_A_directed_ih,
+                         'minor_A_directed_interval_distribution': minor_A_directed_ih,
+                         'major_T_directed_interval_distribution': major_T_directed_ih,
+                         'minor_T_directed_interval_distribution': minor_T_directed_ih,
+                         'major_B_directed_interval_distribution': major_B_directed_ih,
+                         'minor_B_directed_interval_distribution': minor_B_directed_ih,
+                         'major_undirected_interval_distribution': major_undirected_ih,
+                         'minor_undirected_interval_distribution': minor_undirected_ih,
+                         'major_S_undirected_interval_distribution': major_S_undirected_ih,
+                         'minor_S_undirected_interval_distribution': minor_S_undirected_ih,
+                         'major_A_undirected_interval_distribution': major_A_undirected_ih,
+                         'minor_A_undirected_interval_distribution': minor_A_undirected_ih,
+                         'major_T_undirected_interval_distribution': major_T_undirected_ih,
+                         'minor_T_undirected_interval_distribution': minor_T_undirected_ih,
+                         'major_B_undirected_interval_distribution': major_B_undirected_ih,
+                         'minor_B_undirected_interval_distribution': minor_B_undirected_ih,
+                         'error_distribution': eh,
+                         'parallel_error_distribution': peh}
+
+        for dist in distributions:
+            distributions[dist] = histogram_to_distribution(distributions[dist])
+
+        self.error_note_ratio = error_note_ratio
+        self.parallel_error_note_ratio = parallel_error_note_ratio
+        self.distributions = distributions
+
+        grader = Grader(dataset=self, features=FEATURES)
+
+        chorale_vectors = []
+        for chorale in tqdm(self.iterator_gen()):
+            chorale_vector = grader.get_feature_vector(chorale)
+            chorale_vectors.append(chorale_vector)
+
+        gm = GaussianMixture()
+        self.gaussian = gm.fit(chorale_vectors)
 
 
 # notes: all subsequences start on a beat
@@ -673,7 +798,6 @@ class ChoraleBeatsDataset(ChoraleDataset):
                     chorale,
                     offsetStart=offsetStart,
                     offsetEnd=offsetEnd)
-
                 transposition = self.min_max_transposition(current_subseq_ranges)
                 min_transposition_subsequence, max_transposition_subsequence = transposition
 
