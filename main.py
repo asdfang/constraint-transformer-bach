@@ -5,6 +5,7 @@ import importlib
 import os
 import shutil
 from datetime import datetime
+import csv
 
 import click
 import torch
@@ -13,19 +14,30 @@ from transformer_bach.bach_dataloader import BachDataloaderGenerator
 from transformer_bach.decoder_relative import TransformerBach
 from transformer_bach.getters import get_data_processor
 from transformer_bach.melodies import MARIO_MELODY, TETRIS_MELODY, LONG_TETRIS_MELODY
+from transformer_bach.DatasetManager.helpers import load_or_pickle_distributions
+from Grader.grader import Grader, FEATURES
+from tqdm import tqdm
 
+import music21
+from transformer_bach.constraint_helpers import score_to_hold_representation_for_voice
 
 @click.command()
-@click.option('-t', '--train', is_flag=True)
-@click.option('-l', '--load', is_flag=True)
-@click.option('-o', '--overfitted', is_flag=True)
-@click.option('-c', '--config', type=click.Path(exists=True))
-@click.option('-n', '--num_workers', type=int, default=0)
+@click.option('--train', is_flag=True)
+@click.option('--load', is_flag=True)
+@click.option('--update', is_flag=True,
+              help='update the given model for update_iterations')
+@click.option('--overfitted', is_flag=True, 
+              help='whether to load the overfitted model')
+@click.option('--config', type=click.Path(exists=True))
+@click.option('--num_workers', type=int, default=0)
+@click.option('--num_generations', type=int, default=0)
 def main(train,
          load,
+         update,
          overfitted,
          config,
-         num_workers
+         num_workers,
+         num_generations,
          ):
     # Use all gpus available
     gpu_ids = [int(gpu) for gpu in range(torch.cuda.device_count())]
@@ -43,6 +55,7 @@ def main(train,
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
         config['timestamp'] = timestamp
 
+    # set model_dir
     if load:
         model_dir = os.path.dirname(config_path)
     else:
@@ -61,7 +74,7 @@ def main(train,
     )
 
     decoder_kwargs = config['decoder_kwargs']
-    num_channels = 4
+    num_channels = 4            # is this number of voices?
     num_events_grouped = 4
     num_events = dataloader_generator_kwargs['sequences_size'] * 4
     transformer = TransformerBach(
@@ -103,14 +116,40 @@ def main(train,
             num_workers=num_workers
         )
 
-    # melody_constraint = TETRIS_MELODY
-    melody_constraint = LONG_TETRIS_MELODY
-    # melody_constraint = None
+    load_or_pickle_distributions(dataloader_generator.dataset)
+    grader = Grader(dataset=dataloader_generator.dataset,
+                    features=FEATURES)
+
+    print('Scoring real chorales')
+    bach_grades = []
+    for chorale_id, score in tqdm(enumerate(dataloader_generator.dataset.iterator_gen())):
+        grade, chorale_vector = grader.grade_chorale(score)
+        bach_grades.append([grade, *chorale_vector])
+
+    print('\nGenerating and scoring generated chorales')
+    mock_grades = []
     scores = transformer.generate(temperature=0.9,
                                   top_p=0.8,
-                                  batch_size=3,
-                                  melody_constraint=melody_constraint,
+                                  batch_size=num_generations,
+                                  melody_constraint=None,
                                   hard_constraint=True)
+    for score in tqdm(scores):
+        grade, chorale_vector = grader.grade_chorale(score)
+        mock_grades.append([grade, *chorale_vector])
+
+    print('Writing data to csv files')
+    with open('data/bach_grades.csv', 'w') as chorale_file:
+        reader = csv.writer(chorale_file)
+        # reader.writerow(['', 'score'] + list(weights.keys()))
+        for id, grades in enumerate(bach_grades):
+            reader.writerow([id, *grades])
+
+    with open('data/mock_grades.csv', 'w') as chorale_file:
+        reader = csv.writer(chorale_file)
+        # reader.writerow(['', 'score'] + list(weights.keys()))
+        for id, grades in enumerate(mock_grades):
+            reader.writerow([id, *grades])
+
 
 if __name__ == '__main__':
     main()
