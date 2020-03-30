@@ -6,18 +6,11 @@ import matplotlib.pyplot as plt, numpy as np
 from music21 import converter
 
 sys.path[0] += '/../'
-from grader.grader import score_chorale
-from DatasetManager.chorale_dataset import ChoraleDataset
-from DatasetManager.dataset_manager import DatasetManager
-from DatasetManager.metadata import FermataMetadata, TickMetadata, KeyMetadata
-from DeepBach.helpers import *
-
-
-weights = {'error': .5,
-           'parallel_error': .15,
-           'note': 5,
-           'rhythm': 1,
-           'directed_interval': 20}
+from transformer_bach.DatasetManager.chorale_dataset import ChoraleDataset
+from transformer_bach.DatasetManager.dataset_manager import DatasetManager
+from transformer_bach.DatasetManager.metadata import FermataMetadata, TickMetadata, KeyMetadata
+from transformer_bach.utils import *
+from Grader.grader import FEATURES
 
 
 @click.command()
@@ -28,12 +21,12 @@ def main(model_id):
     #     plot_boxplot_per_iteration(data_file=f'data/{model_id}_update_scores_over_bach_chorales.csv', 
     #                                 plot_dir=f'plots/model_{model_id}', col=col)
     
-    for col in range(1, 13):
+    for col in range(1, len(FEATURES) + 2):
         temp = 'Grade' if col == 1 else 'Distance'
         plot_distributions(plt_title=f'{temp} distribution of real and generated chorales', 
-                            chorale_file='data/grading-function-experiments/chorale_grades.csv',
-                            generation_file='data/grading-function-experiments/generation_grades.csv',
-                            plot_dir='plots/grading-function-experiments/',
+                            chorale_file='data/bach_grades.csv',
+                            generation_file='data/mock_grades.csv',
+                            plot_dir='plots/',
                             col=col)
 
 
@@ -72,8 +65,8 @@ def plot_distributions(plt_title=None,
     # plot distributions
     plt.figure()
     bins = np.histogram(np.hstack((chorale_scores, generation_scores)), bins=100)[1]
-    plt.hist(chorale_scores, label='Generated chorales', alpha=0.5, bins=bins)
-    plt.hist(generation_scores, label='Model 4 (base model, no transpositions)', alpha=0.5, bins=bins)
+    plt.hist(chorale_scores, label='Real chorales', alpha=0.5, bins=bins)
+    plt.hist(generation_scores, label='Generated chorales', alpha=0.5, bins=bins)
     plt.xlabel(label)
     plt.ylabel('Frequency')
     plt.title(plt_title)
