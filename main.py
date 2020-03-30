@@ -120,33 +120,33 @@ def main(train,
     grader = Grader(dataset=dataloader_generator.dataset,
                     features=FEATURES)
 
-    print('Scoring real chorales')
+    print('Grading real chorales')
     bach_grades = []
-    for chorale_id, score in tqdm(enumerate(dataloader_generator.dataset.iterator_gen())):
+    for score in tqdm(dataloader_generator.dataset.iterator_gen()):
         grade, chorale_vector = grader.grade_chorale(score)
         bach_grades.append([grade, *chorale_vector])
 
-    print('\nGenerating and scoring generated chorales')
+    print('\nGenerating and grading generated chorales')
     mock_grades = []
-    scores = transformer.generate(temperature=0.9,
-                                  top_p=0.8,
-                                  batch_size=num_generations,
-                                  melody_constraint=None,
-                                  hard_constraint=True)
-    for score in tqdm(scores):
+    for _ in tqdm(range(num_generations)):
+        score = transformer.generate(temperature=0.9,
+                                     top_p=0.8,
+                                     batch_size=1,
+                                     melody_constraint=None,
+                                     hard_constraint=True)[0]
         grade, chorale_vector = grader.grade_chorale(score)
         mock_grades.append([grade, *chorale_vector])
 
     print('Writing data to csv files')
     with open('data/bach_grades.csv', 'w') as chorale_file:
         reader = csv.writer(chorale_file)
-        # reader.writerow(['', 'score'] + list(weights.keys()))
+        reader.writerow(['', 'score'] + FEATURES)
         for id, grades in enumerate(bach_grades):
             reader.writerow([id, *grades])
 
     with open('data/mock_grades.csv', 'w') as chorale_file:
         reader = csv.writer(chorale_file)
-        # reader.writerow(['', 'score'] + list(weights.keys()))
+        reader.writerow(['', 'score'] + FEATURES)
         for id, grades in enumerate(mock_grades):
             reader.writerow([id, *grades])
 
