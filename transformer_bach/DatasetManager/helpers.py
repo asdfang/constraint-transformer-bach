@@ -100,10 +100,11 @@ class TensorDatasetIndexed(TensorDataset):
 
 
 def load_or_pickle_distributions(dataset):
-    distributions_file = 'Grader/pickles/bach_distributions.txt'
-    error_note_ratio_file = 'Grader/pickles/error_note_ratio.txt'
-    parallel_error_note_ratio_file = 'Grader/pickles/parallel_error_note_ratio.txt'
-    gaussian_file = 'Grader/pickles/gaussian.txt'
+    pickles_dir = f'{os.path.expanduser("~")}/transformer-bach/Grader/pickles/'
+    distributions_file = os.path.join(pickles_dir, 'bach_distributions.txt')
+    error_note_ratio_file =  os.path.join(pickles_dir, 'error_note_ratio.txt')
+    parallel_error_note_ratio_file =  os.path.join(pickles_dir, 'parallel_error_note_ratio.txt')
+    gaussian_file = os.path.join(pickles_dir, 'gaussian.txt')
 
     if os.path.exists(distributions_file) and os.path.exists(error_note_ratio_file) and os.path.exists(
             parallel_error_note_ratio_file) and os.path.exists(gaussian_file):
