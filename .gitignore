@@ -6,12 +6,6 @@ cortex_key.pub
 # ignore midi files
 *.mid
 
-# ignore
-plots/*
-generations/**
-models/**
-data/**
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -105,15 +99,10 @@ ENV/
 
 # local files
 .idea/
-stats/
-deepbach_ressources/
-DeepBach/models/*.yaml
-DeepBach/models/*.h5
-old_models/
-good_model/
-generated_examples/
-DeepBach/datasets/raw_dataset/*.pickle
-DeepBach/datasets/custom_dataset/*.pickle
+Grader/pickles/**
+generations/**
+models/**
+data/**
 
 *.tar.gz
 !download_pretrained_data.sh
