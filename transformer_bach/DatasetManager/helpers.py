@@ -71,22 +71,13 @@ def standard_note(note_or_rest_string):
         return note.Note(note_or_rest_string)
 
 
-class ShortChoraleIteratorGen:
-    """
-    Class used for debugging
-    when called, it returns an iterator over 3 Bach chorales,
-    similar to music21.corpus.chorales.Iterator()
-    """
-
-    def __init__(self):
-        pass
+class NextChoralesIteratorGen:
+    def __init__(self, start_idx, end_idx):
+        self.start_idx = start_idx
+        self.end_idx = end_idx
 
     def __call__(self):
-        it = (
-            chorale
-            for chorale in
-            islice(music21.corpus.chorales.Iterator(), 10)
-        )
+        it = (chorale for chorale in islice(music21.corpus.chorales.Iterator(), self.start_idx, self.end_idx))
         return it.__iter__()
 
 
