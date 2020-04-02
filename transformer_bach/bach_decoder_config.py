@@ -29,9 +29,13 @@ config = {
     'lr':                          1e-5,
     'batch_size':                  8,
     'num_batches':                 128,
-    'num_epochs':                  2000,
+    'num_epochs':                  1000,
 
     # ======== model ID ========
     'timestamp':                   None,
     'savename':                    Path(__file__).stem,
+
+    # ======== Update ========
+    'update_iterations':           10,
+    'generations_per_iteration':   50,
 }
