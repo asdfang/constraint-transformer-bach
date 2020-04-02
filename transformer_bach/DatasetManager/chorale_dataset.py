@@ -84,7 +84,7 @@ class ChoraleDataset(MusicDataset):
         if not os.path.exists(index_dict_dir):
             os.mkdir(index_dict_dir)
         if not os.path.isfile(index_dict_path):
-            print('Building index dictionnary. Might take some time')
+            print('Building index dictionary. Might take some time')
             answer = None
             while answer not in ['y', 'n', 'index']:
                 answer = input('Continue? Type y or n or index!\n')
