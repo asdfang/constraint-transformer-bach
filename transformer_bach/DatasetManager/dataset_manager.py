@@ -1,12 +1,26 @@
 import os
 import torch
+import music21
 
 from transformer_bach.DatasetManager.music_dataset import MusicDataset
-from transformer_bach.all_datasets import get_all_datasets
+from transformer_bach.DatasetManager.chorale_dataset import ChoraleDataset, ChoraleBeatsDataset
+from transformer_bach.DatasetManager.helpers import NextChoralesIteratorGen
 
 # to use an existing dataset, add an entry in the all_datasets variable
 # and specify its base class and which music21 objects it uses
 # by giving an iterator over music21 scores
+all_datasets = {
+    'bach_chorales':
+        {
+            'dataset_class_name': ChoraleDataset,
+            'corpus_it_gen':      music21.corpus.chorales.Iterator
+        },
+    'bach_chorales_beats':
+        {
+            'dataset_class_name': ChoraleBeatsDataset,
+            'corpus_it_gen':      music21.corpus.chorales.Iterator
+        },
+}
 
 class DatasetManager:
     def __init__(self):
@@ -14,11 +28,22 @@ class DatasetManager:
         # create cache dir if it doesn't exist
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
+        
+        self.all_datasets = all_datasets
+
+    def add_dataset(self, 
+                    dataset_name, 
+                    dataset_class_name, 
+                    corpus_it_gen):
+        self.all_datasets[dataset_name] = {'dataset_class_name': dataset_class_name,
+                                           'corpus_it_gen': corpus_it_gen}
+    
+    def get_all_datasets(self):
+        return self.all_datasets
 
     def get_dataset(self, name: str, **dataset_kwargs) -> MusicDataset:
-
-        all_datasets = get_all_datasets()
-
+        all_datasets = self.get_all_datasets()
+        
         if name in all_datasets:
             return self.load_if_exists_or_initialize_and_save(
                 name=name,
