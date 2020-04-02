@@ -31,17 +31,17 @@ class BachDataloaderGenerator(DataloaderGenerator):
         )
         super(BachDataloaderGenerator, self).__init__(dataset=dataset)
 
-    def dataloaders(self, batch_size, num_workers=0, shuffle_train=True,
+    def dataloaders(self, batch_size, num_workers=0, split=[0.85, 0.10], shuffle_train=True,
                     shuffle_val=False):
         # discard metadata
         # and put num_channels (num_voices) at the last dimension
-        return [({'x': t[0].transpose(1, 2)}
-                 for t in dataloader)
-                for dataloader
-                in self.dataset.data_loaders(batch_size, num_workers=num_workers,
-                                             shuffle_train=shuffle_train,
-                                             shuffle_val=shuffle_val
-                                             )]
+        return [({'x': t[0].transpose(1, 2)} for t in dataloader)
+                    for dataloader
+                    in self.dataset.data_loaders(batch_size, 
+                                                 num_workers=num_workers,
+                                                 split=split,
+                                                 shuffle_train=shuffle_train,
+                                                 shuffle_val=shuffle_val)]
 
     def write(self, x, path):
         """
