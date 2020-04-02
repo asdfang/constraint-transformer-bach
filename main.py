@@ -6,20 +6,23 @@ import os
 import shutil
 from datetime import datetime
 import csv
-
+from itertools import islice
 import click
 import torch
 
 from transformer_bach.bach_dataloader import BachDataloaderGenerator
+from transformer_bach.small_bach_dataloader import SmallBachDataloaderGenerator
 from transformer_bach.decoder_relative import TransformerBach
 from transformer_bach.getters import get_data_processor
 from transformer_bach.melodies import MARIO_MELODY, TETRIS_MELODY, LONG_TETRIS_MELODY
 from transformer_bach.DatasetManager.helpers import load_or_pickle_distributions
+from transformer_bach.constraint_helpers import score_to_hold_representation_for_voice
+from transformer_bach.utils import ensure_dir, get_threshold
+from transformer_bach.all_datasets import get_all_datasets
 from Grader.grader import Grader, FEATURES
 from tqdm import tqdm
 
 import music21
-from transformer_bach.constraint_helpers import score_to_hold_representation_for_voice
 
 @click.command()
 @click.option('--train', is_flag=True)
@@ -120,9 +123,50 @@ def main(train,
     grader = Grader(dataset=dataloader_generator.dataset,
                     features=FEATURES)
 
+    # BASELINE EXPERIMENT
+    if update:
+        transformer.to('cuda')
+        update_iterations = config['update_iterations']
+        generations_per_iteration = config['generations_per_iteration']
+        batch_size = 351 // update_iterations
+
+        update_file = open(f'data/update_grades_over_bach_chorales.csv', 'w')
+        reader = csv.writer(update_file)
+        reader.writerow(['', 'iter', 'grade'] + FEATURES)
+
+        for i in range(update_iterations):
+            print(f'----------- Iteration {i} -----------')
+            print(f'Update model on chorales {i * batch_size} through {(i+1) * batch_size}')
+            next_dataloader_generator = SmallBachDataloaderGenerator(
+                sequences_size=dataloader_generator_kwargs['sequences_size'],
+                start_idx = i * batch_size,
+                end_idx = (i+1) * batch_size
+            )
+            
+            transformer.dataloader_generator = next_dataloader_generator            
+            transformer.train_model(batch_size=config['batch_size'],
+                                    num_batches=config['num_batches'],
+                                    num_epochs=config['num_epochs'],
+                                    lr=config['lr'],
+                                    num_workers=num_workers)
+            
+            print(f'Generate {num_generations} chorales')
+            ensure_dir(f'{transformer.model_dir}/generations/{i}/')
+            for j in tqdm(range(generations_per_iteration)):
+                score = transformer.generate(temperature=0.9,
+                                             top_p=0.8,
+                                             batch_size=1,
+                                             melody_constraint=None,
+                                             write_to_midi=False)[0]
+                score.write('midi', f'{transformer.model_dir}/generations/{i}/c{j}.mid')
+                
+                grade, chorale_vector = grader.grade_chorale(score)
+                reader.writerow([i, j, grade, *chorale_vector])      # iteration, generation #, grade
+
     print('Grading real chorales')
     bach_grades = []
-    for score in tqdm(dataloader_generator.dataset.iterator_gen()):
+    bach_chorales = islice(dataloader_generator.dataset.iterator_gen(), num_generations)
+    for score in tqdm(enumerate(bach_chorales)):
         grade, chorale_vector = grader.grade_chorale(score)
         bach_grades.append([grade, *chorale_vector])
 
@@ -140,13 +184,13 @@ def main(train,
     print('Writing data to csv files')
     with open('data/bach_grades.csv', 'w') as chorale_file:
         reader = csv.writer(chorale_file)
-        reader.writerow(['', 'score'] + FEATURES)
+        reader.writerow(['', 'grade'] + FEATURES)
         for id, grades in enumerate(bach_grades):
             reader.writerow([id, *grades])
 
     with open('data/mock_grades.csv', 'w') as chorale_file:
         reader = csv.writer(chorale_file)
-        reader.writerow(['', 'score'] + FEATURES)
+        reader.writerow(['', 'grade'] + FEATURES)
         for id, grades in enumerate(mock_grades):
             reader.writerow([id, *grades])
 
