@@ -75,7 +75,7 @@ class ChoraleDataset(MusicDataset):
         Implementation of the make_tensor_dataset abstract base class
         """
         index_dict_dir = os.path.join(self.cache_dir, f'index_dicts')
-        index_dict_path = os.path.join(index_dict_dir, f'{self.name}.pkl')
+        index_dict_path = os.path.join(index_dict_dir, f'index_dicts.pkl')
         
         # Compute or load index dict
         # input "index" to use this dataset as a reference
@@ -730,10 +730,9 @@ class ChoraleBeatsDataset(ChoraleDataset):
         Implementation of the make_tensor_dataset abstract base class
         """
         # todo check on chorale with Chord
-        index_dict_dir = os.path.join(self.cache_dir,
-                                      f'index_dicts')
-        index_dict_path = os.path.join(index_dict_dir,
-                                       f'{self.name}.pkl')
+        index_dict_dir = os.path.join(self.cache_dir, f'index_dicts')
+        index_dict_path = os.path.join(index_dict_dir, f'index_dicts.pkl')
+        
         # Compute or load index dict
         # input "index" to use this dataset as a reference
         # input "y" to first compute the standardized dataset
@@ -741,7 +740,7 @@ class ChoraleBeatsDataset(ChoraleDataset):
         if not os.path.exists(index_dict_dir):
             os.mkdir(index_dict_dir)
         if not os.path.isfile(index_dict_path):
-            print('Building index dictionnary. Might take some time')
+            print('Building index dictionary. Might take some time')
             answer = None
             while answer not in ['y', 'n', 'index']:
                 answer = input('Continue? Type y or n or index!\n')
