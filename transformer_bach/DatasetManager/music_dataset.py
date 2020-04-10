@@ -19,8 +19,9 @@ class MusicDataset(ABC):
 
     @property
     def cache_dir(self):
-        folder = 'with_transpositions' if self.include_transpositions else 'without_transpositions'
-        cache_dir = f'{os.path.expanduser("~")}/transformer-bach/data/{folder}/dataset_cache'
+        # folder = 'with_transpositions' if self.include_transpositions else 'without_transpositions'
+        # cache_dir = f'{os.path.expanduser("~")}/transformer-bach/data/{folder}/dataset_cache'
+        cache_dir = f'{os.path.expanduser("~")}/transformer-bach/data/dataset_cache'
         return cache_dir
 
     @abstractmethod
@@ -162,20 +163,25 @@ class MusicDataset(ABC):
         return os.path.join(cache_dir, self.__repr__(), 'dataset')
 
     def split_datasets(self, split=(0.85, 0.10), indexed_datasets=False):
-        assert sum(split) < 1
+        assert sum(split) <= 1
         dataset = self.get_tensor_dataset(self.cache_dir)
         num_examples = len(dataset)
         a, b = split
+        
+        val_dataset, eval_dataset = None, None
+
         if indexed_datasets:
             train_dataset = TensorDatasetIndexed(*dataset[: int(a * num_examples)])
-            val_dataset = TensorDatasetIndexed(*dataset[int(a * num_examples):
-                                                        int((a + b) * num_examples)])
-            eval_dataset = TensorDatasetIndexed(*dataset[int((a + b) * num_examples):])
+            if a < 1:
+                val_dataset = TensorDatasetIndexed(*dataset[int(a * num_examples): int((a + b) * num_examples)])
+            if a + b < 1:
+                eval_dataset = TensorDatasetIndexed(*dataset[int((a + b) * num_examples):])
         else:
             train_dataset = TensorDataset(*dataset[: int(a * num_examples)])
-            val_dataset = TensorDataset(*dataset[int(a * num_examples):
-                                                 int((a + b) * num_examples)])
-            eval_dataset = TensorDataset(*dataset[int((a + b) * num_examples):])
+            if a < 1:
+                val_dataset = TensorDataset(*dataset[int(a * num_examples): int((a + b) * num_examples)])
+            if a + b < 1:
+                eval_dataset = TensorDataset(*dataset[int((a + b) * num_examples):])
         return train_dataset, val_dataset, eval_dataset
 
     def data_loaders(self, batch_size,
