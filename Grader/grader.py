@@ -25,11 +25,15 @@ class Grader:
         self.features = features
     
     def grade_chorale(self, chorale):
-        chorale_vector = self.get_feature_vector(chorale)
+        try:
+            chorale_vector = self.get_feature_vector(chorale)
+        except:     # sometimes the grading function fails
+            return float('-inf'), []
+        
         gm = self.dataset.gaussian
         grade = gm.score([chorale_vector])
-        
         return grade, chorale_vector
+    
     
     def get_feature_vector(self, chorale):
         assert self.dataset.distributions is not None
