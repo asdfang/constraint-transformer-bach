@@ -143,15 +143,3 @@ def ensure_dir(directory):
     """
     if not os.path.exists(directory):
         os.makedirs(directory)
-
-
-def get_threshold(data_file=None, col=-1):
-    thres = np.NINF         # minimum score seen so far
-    
-    with open(data_file, 'r') as fin:
-        next(fin)
-        for row in fin:
-            s = float(row.split(',')[col])
-            if s > thres:
-                thres = s
-    return thres
