@@ -14,9 +14,16 @@ from transformer_bach.utils import *
 from Grader.grader import FEATURES
 from Grader.helpers import get_threshold
 
+data_file='models/aug_gen_4-14/generations/update_grades.csv'
 
 def main():
-    plot_selections_per_iteration()
+    data_dict = read_update_data(data_file=data_file, feature='grade')
+    for it, grades in data_dict.items():
+        print(f'Iteration {it}: {np.sum([1 for grade in grades if grade == 33.270499749145515])} chorales with grade 33.270499749145515')
+    
+    # plot_boxplot_per_iteration(data_file=data_file, threshold=-200)
+    # plot_histogram_per_iteration(data_file=data_file)
+    # plot_selections_per_iteration(data_file=data_file)
 
 
 def plot_distributions(data_files=['results/bach_grades.csv', 'results/unconstrained_mock_grades.csv'],
@@ -73,7 +80,7 @@ def plot_distributions(data_files=['results/bach_grades.csv', 'results/unconstra
 
 def plot_boxplot_per_iteration(data_file='results/update_grades_over_bach_chorales.csv', 
                                feature='grade', 
-                               plt_dir='plots/', 
+                               plt_dir='plots/augmented-generation/', 
                                threshold=None):
     """
     Arguments
@@ -96,16 +103,16 @@ def plot_boxplot_per_iteration(data_file='results/update_grades_over_bach_choral
     plt.title(f'{feature} distribution of generations after each update iteration')
     plt.ylabel(feature)
     
-    thres = get_threshold(data_file='results/bach_grades.csv', feature=feature)
+    thres = get_threshold(feature=feature)
     plt.axhline(y=thres, color='steelblue', linestyle='-')
 
     ensure_dir(plt_dir)
     plt.savefig(os.path.join(plt_dir, f'{feature}_update_boxplots.png'))
 
 
-def plot_histogram_per_iteration(data_file='results/update_grades_over_bach_chorales.csv', 
+def plot_histogram_per_iteration(data_file, 
                                  feature='grade',
-                                 plot_dir='plots/',
+                                 plot_dir='plots/augmented-generation/',
                                  threshold=None):
     """
     visualize model updates by plotting histogram for grade distribution at each iteration
@@ -128,7 +135,7 @@ def plot_histogram_per_iteration(data_file='results/update_grades_over_bach_chor
 
 
 def plot_selections_per_iteration(data_file='results/update_grades_over_bach_chorales.csv',
-                                  plot_dir='plots/'):
+                                  plot_dir='plots/augmented-generation/'):
     """
     plot number of selections each iteration
     """
@@ -157,13 +164,17 @@ def label_bars(rects):
 
 
 def read_update_data(data_file, feature, threshold=None):
+    """
+    Returns dictionary with iteration as key and list of grades/distances as value
+    """
     df = pd.read_csv(data_file)
-    update_iterations = np.max(df['iter'])
+    df = df.replace(float('-inf'), np.nan).dropna(subset=['grade'])
+    update_iterations = np.max([int(it) for it in df['iter']])
     data_dict = {}
     for it in range(update_iterations + 1):
         grades = df.loc[df['iter'] == it][feature]
         if threshold:
-            grades = [x for x in grades if x > -200]
+            grades = [x for x in grades if x > threshold]
         data_dict[it+1] = grades
     
     return data_dict
