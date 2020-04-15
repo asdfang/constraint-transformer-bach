@@ -9,6 +9,7 @@ import csv
 from itertools import islice
 import click
 import torch
+import random
 
 from transformer_bach.bach_dataloader import BachDataloaderGenerator
 from transformer_bach.small_bach_dataloader import SmallBachDataloaderGenerator
@@ -18,6 +19,8 @@ from transformer_bach.melodies import MARIO_MELODY, TETRIS_MELODY, LONG_TETRIS_M
 from transformer_bach.DatasetManager.helpers import load_or_pickle_distributions
 from transformer_bach.constraint_helpers import score_to_hold_representation_for_voice
 from transformer_bach.utils import ensure_dir
+from experiments.update_model import update_on_generations, update_on_bach
+from experiments.generate_and_grade import grade_bach, grade_constrained_mock, grade_unconstrained_mock
 from Grader.grader import Grader, FEATURES
 from Grader.helpers import get_threshold
 from tqdm import tqdm
@@ -28,7 +31,9 @@ import music21
 @click.option('--train', is_flag=True)
 @click.option('--load', is_flag=True)
 @click.option('--update', is_flag=True,
-              help='update the given model for update_iterations')
+              help='update the given model')
+@click.option('--generate', is_flag=True,
+              help='generate from the given model')
 @click.option('--overfitted', is_flag=True, 
               help='whether to load the overfitted model')
 @click.option('--config', type=click.Path(exists=True))
@@ -36,6 +41,7 @@ import music21
 def main(train,
          load,
          update,
+         generate,
          overfitted,
          config,
          num_workers,
@@ -123,177 +129,13 @@ def main(train,
     grader = Grader(dataset=bach_dataloader_generator.dataset,
                     features=FEATURES)
 
-    # BASELINE EXPERIMENT
     if update:
-        update_iterations = config['update_iterations']
-        generations_per_iteration = config['generations_per_iteration']
-
-        update_file = open(f'results/update_grades.csv', 'w')
-        reader = csv.writer(update_file)
-        reader.writerow(['iter', 'gen_id', 'grade'] + FEATURES)
-
-        thres = get_threshold(data_file='results/bach_grades.csv', feature='grade')
-        print(f'Selection threshold: {thres}')
-
-        for i in range(update_iterations):
-            print(f'----------- Iteration {i} -----------')
-            print(f'Generate {generations_per_iteration} chorales')
-            ensure_dir(f'{transformer.model_dir}/generations/{i}/')
-            picked_chorales = []
-            
-            scores = transformer.generate(temperature=0.9,
-                                          top_p=0.8,
-                                          batch_size=generations_per_iteration,
-                                          melody_constraint=None)
-            
-            for j, score in enumerate(scores):
-                score.write('midi', f'{transformer.model_dir}/generations/{i}/c{j}.mid')
-                grade, chorale_vector = grader.grade_chorale(score)
-                reader.writerow([i, j, grade, *chorale_vector])      # iteration, generation #, grade
-                if grade > thres:
-                    print(f'Picked chorale {j} with grade {grade}')
-                    picked_chorales.append(score)
-            
-            print(f'Picked {len(picked_chorales)} chorales')
-
-            if len(picked_chorales) == 0:
-                continue
-
-            print('Creating dataset')
-            next_dataloader_generator = SmallBachDataloaderGenerator(
-                sequences_size=dataloader_generator_kwargs['sequences_size'],
-                dataset_name=f'bach_chorales_beats_{i}',
-                chorales=picked_chorales,
-            )
-            
-            transformer.dataloader_generator = next_dataloader_generator            
-            print('Training model on dataset')
-            transformer.train_model(batch_size=config['batch_size'],
-                                    num_batches=config['num_batches'],
-                                    num_epochs=config['num_epochs'],
-                                    lr=config['lr'],
-                                    num_workers=num_workers)
-
-
-def grade_bach(grader, 
-               bach_iterator, 
-               grades_csv='results/tmp.csv'):
-    """
-    grade Bach chorales
+        update_on_generations(transformer=transformer, 
+                              grader=grader, 
+                              config=config)
     
-    Usage example:
-        grade_bach(grader=grader, 
-                   bach_iterator=bach_dataloader_generator.dataset.iterator_gen(), 
-                   grades_csv='results/bach_grades.csv')
-    """
-    print('Grading Bach chorales')
-    bach_grades = []
-
-    for bach_score in tqdm(bach_iterator):
-        grade, chorale_vector = grader.grade_chorale(bach_score)
-        bach_grades.append([grade, *chorale_vector])
-
-    print('Writing data to csv files')
-    with open(grades_csv, 'w') as chorale_file:
-        reader = csv.writer(chorale_file)
-        reader.writerow(['', 'grade'] + FEATURES)
-        for i, grades in enumerate(bach_grades):
-            reader.writerow([i, *grades])
-
-
-def grade_unconstrained_mock(grader, 
-                             transformer,
-                             grades_csv='results/tmp.csv',
-                             num_generations=1):
-    """
-    Arguments:
-        grader: Grader object
-        transformer: model for generation
-        grades_csv: csv file to write grades to
-        num_generations: number of generations
-    
-    Usage example:
-        grade_unconstrained_mock(grader=grader,
-                                 transformer=transformer,
-                                 grades_csv='results/unconstrained_mock_grades.csv',
-                                 num_generations=351)
-    """
-    print('Generating and grading unconstrained mock chorales')
-    mock_grades = []
-    for i in tqdm(range(num_generations)):
-        mock_score = transformer.generate(temperature=0.9,
-                                          top_p=0.8,
-                                          batch_size=1)[0]
-        # write mock_score to MIDI
-        output_dir = f'{transformer.model_dir}/unconstrained_mocks/'
-        ensure_dir(output_dir)
-        mock_score.write('midi', f'{output_dir}/{i}.mid')
-        
-        # grade chorale
-        grade, chorale_vector = grader.grade_chorale(mock_score)
-        mock_grades.append([grade, *chorale_vector])
-    
-    print('Writing data to csv file')
-    with open(grades_csv, 'w') as chorale_file:
-        reader = csv.writer(chorale_file)
-        reader.writerow(['', 'grade'] + FEATURES)
-        for i, grades in enumerate(mock_grades):
-            reader.writerow([i, *grades])
-
-
-def grade_constrained_mock(grader,
-                           transformer,
-                           grades_csv='results/tmp.csv',
-                           bach_iterator=None,
-                           output_dir=None,
-                           ):
-    """
-    Arguments:
-        grader: Grader object
-        transformer: model for generation
-        grades_csv: csv file to write grades to
-        bach_iterator: iterator containing Bach chorales
-    
-    Usage example:
-        grade_constrained_mock(grader=grader,
-                               transformer=transformer,
-                               grades_csv='results/tmp.csv',
-                               bach_iterator=islice(bach_dataloader_generator.dataset.iterator_gen(), 1),
-                               output_dir='chorales/testing/')
-    """
-    print('Generating and grading constrained mock chorales')
-    mock_grades = []
-
-    for i, bach_score in tqdm(enumerate(bach_iterator)):
-        bach_melody = score_to_hold_representation_for_voice(bach_score, voice=0)
-        try:
-            mock_score = transformer.generate(temperature=0.9,
-                                              top_p=0.8,
-                                              batch_size=1,
-                                              melody_constraint=bach_melody,
-                                              hard_constraint=True)[0]
-        # IndexError: index 96 is out of bounds for dimension 1 with size 96 on line 504
-        except IndexError:
-            print(f'chorale {i} is problem')
-            mock_grades.append([float('-inf')])
-            continue
-        
-        # write mock_score to MIDI
-        if output_dir is None:
-            output_dir = f'{transformer.model_dir}/constrained_mocks/'
-        ensure_dir(output_dir)
-        mock_score.write('midi', f'{output_dir}/{i}.mid')
-        
-        # grade chorale
-        grade, chorale_vector = grader.grade_chorale(mock_score)
-        mock_grades.append([grade, *chorale_vector])
-
-    print('Writing data to csv file')
-    with open(grades_csv, 'w') as chorale_file:
-        reader = csv.writer(chorale_file)
-        reader.writerow(['', 'grade'] + FEATURES)
-        for i, grades in enumerate(mock_grades):
-            reader.writerow([i, *grades])
+    if generate:
+        grade_unconstrained_mock(transformer=transformer, grader=grader)
 
 
 if __name__ == '__main__':
