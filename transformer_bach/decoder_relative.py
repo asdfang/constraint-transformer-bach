@@ -358,33 +358,33 @@ class TransformerBach(nn.Module):
             )
             del generator_train
 
-            monitored_quantities_val = self.epoch(
-                data_loader=generator_val,
-                train=False,
-                num_batches=num_batches // 2 if num_batches is not None else None,
-            )
-            del generator_val
+            # monitored_quantities_val = self.epoch(
+            #     data_loader=generator_val,
+            #     train=False,
+            #     num_batches=num_batches // 2 if num_batches is not None else None,
+            # )
+            # del generator_val
 
-            valid_loss = monitored_quantities_val['loss']
+            # valid_loss = monitored_quantities_val['loss']
             # self.scheduler.step(monitored_quantities_val["loss"])
 
             print(f'======= Epoch {epoch_id} =======')
             print(f'---Train---')
             dict_pretty_print(monitored_quantities_train, endstr=' ' * 5)
-            print()
-            print(f'---Val---')
-            dict_pretty_print(monitored_quantities_val, endstr=' ' * 5)
-            print('\n')
+            # print()
+            # print(f'---Val---')
+            # dict_pretty_print(monitored_quantities_val, endstr=' ' * 5)
+            # print('\n')
 
             self.save(early_stopped=False)
-            if valid_loss < best_val:
-                self.save(early_stopped=True)
-                best_val = valid_loss
+            # if valid_loss < best_val:
+            #     self.save(early_stopped=True)
+            #     best_val = valid_loss
 
-            if plot:
-                self.plot(epoch_id,
-                          monitored_quantities_train,
-                          monitored_quantities_val)
+            # if plot:
+            #     self.plot(epoch_id,
+            #               monitored_quantities_train,
+            #               monitored_quantities_val)
 
     def plot(self, epoch_id, monitored_quantities_train,
              monitored_quantities_val):
@@ -530,15 +530,6 @@ class TransformerBach(nn.Module):
         for score in scores:
             self.trim_generated_chorale(score)
 
-        # save scores in model_dir
-        if not os.path.exists(f'{self.model_dir}/generations'):
-            os.mkdir(f'{self.model_dir}/generations')
-
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-        
-        for k, score in enumerate(scores):
-            score.write('midi', f'{self.model_dir}/generations/{timestamp}_{k}.mid')
-
         return scores
 
     def init_generation_chorale(self, num_events, start_index, melody_constraint=None):
@@ -569,7 +560,8 @@ class TransformerBach(nn.Module):
         """
         for part in score.parts:
             found = music21.search.noteNameSearch(part, [standard_note(END_SYMBOL)])   # look for end note
-            assert len(found) in [0, 1] and part.isSorted  # either there's exactly one end note, or none
+            # assert len(found) in [0, 1]       # either there's exactly one end note, or none
+            assert part.isSorted  
             if found:
                 end_idx = found[0]
                 num_pops = len(part) - end_idx      # total number of notes to 

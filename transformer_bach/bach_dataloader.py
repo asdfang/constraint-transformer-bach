@@ -10,11 +10,9 @@ metadatas = [
     TickMetadata(subdivision=subdivision),
     KeyMetadata()
 ]
-include_transpositions = False
-
 
 class BachDataloaderGenerator(DataloaderGenerator):
-    def __init__(self, sequences_size):
+    def __init__(self, include_transpositions, sequences_size):
         dataset_manager = DatasetManager()
 
         chorale_dataset_kwargs = {

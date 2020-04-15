@@ -1,7 +1,7 @@
 from transformer_bach.DatasetManager.chorale_dataset import ChoraleBeatsDataset
 from transformer_bach.DatasetManager.dataset_manager import DatasetManager
 from transformer_bach.DatasetManager.metadata import FermataMetadata, TickMetadata, KeyMetadata
-from transformer_bach.DatasetManager.helpers import NextChoralesIteratorGen
+from transformer_bach.DatasetManager.helpers import ChoralesIteratorGen
 from transformer_bach.dataloader_generator import DataloaderGenerator
 
 subdivision = 4
@@ -15,7 +15,7 @@ include_transpositions = True
 
 
 class SmallBachDataloaderGenerator(DataloaderGenerator):
-    def __init__(self, sequences_size, start_idx, end_idx):
+    def __init__(self, sequences_size, dataset_name, chorales):
         dataset_manager = DatasetManager()
 
         chorale_dataset_kwargs = {
@@ -27,13 +27,13 @@ class SmallBachDataloaderGenerator(DataloaderGenerator):
         }
 
         dataset_manager.add_dataset(
-            dataset_name=f'bach_chorales_beats_{start_idx}_to_{end_idx}',
+            dataset_name=dataset_name,
             dataset_class_name=ChoraleBeatsDataset,
-            corpus_it_gen=NextChoralesIteratorGen(start_idx, end_idx)
+            corpus_it_gen=ChoralesIteratorGen(chorales)
         )
 
         dataset: ChoraleBeatsDataset = dataset_manager.get_dataset(
-            name=f'bach_chorales_beats_{start_idx}_to_{end_idx}',
+            name=dataset_name,
             **chorale_dataset_kwargs
         )
 
