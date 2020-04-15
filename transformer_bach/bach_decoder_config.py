@@ -5,6 +5,7 @@ config = {
 
     # --- Dataloader ---
     'dataloader_generator_kwargs': dict(
+        include_transpositions=False,
         sequences_size=24
     ),
 
@@ -29,7 +30,7 @@ config = {
     'lr':                          1e-5,
     'batch_size':                  8,
     'num_batches':                 128,
-    'num_epochs':                  1000,
+    'num_epochs':                  2000,
 
     # ======== model ID ========
     'timestamp':                   None,
@@ -38,4 +39,5 @@ config = {
     # ======== Update ========
     'update_iterations':           10,
     'generations_per_iteration':   50,
+    'num_epochs_per_iteration':    100,
 }
