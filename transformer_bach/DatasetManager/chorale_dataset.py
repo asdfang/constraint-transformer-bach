@@ -96,8 +96,7 @@ class ChoraleDataset(MusicDataset):
                     voice_ids=self.voice_ids,
                     metadatas=None,
                     sequences_size=1,
-                    subdivision=4,
-                    include_transpositions=include_transpositions)
+                    subdivision=4)
                 smallest_bach_dataset.make_tensor_dataset()
                 index_dicts = {
                     'index2note_dicts': smallest_bach_dataset.index2note_dicts,
@@ -725,7 +724,7 @@ class ChoraleBeatsDataset(ChoraleDataset):
                f'{self.sequences_size},' \
                f'{self.subdivision})'
 
-    def make_tensor_dataset(self):
+    def make_tensor_dataset(self, include_transpositions=False):
         """
         Implementation of the make_tensor_dataset abstract base class
         """
@@ -743,7 +742,7 @@ class ChoraleBeatsDataset(ChoraleDataset):
             print('Building index dictionary. Might take some time')
             answer = None
             while answer not in ['y', 'n', 'index']:
-                answer = input('Continue? Type y or n or index!\n')
+                answer = input('Continue? Type y or n or index!\n')    
             if answer == 'y':
                 smallest_bach_dataset = ChoraleBeatsDataset(
                     corpus_it_gen=self.corpus_it_gen,
@@ -797,11 +796,15 @@ class ChoraleBeatsDataset(ChoraleDataset):
                     chorale,
                     offsetStart=offsetStart,
                     offsetEnd=offsetEnd)
-                transposition = self.min_max_transposition(current_subseq_ranges)
-                min_transposition_subsequence, max_transposition_subsequence = transposition
 
-                for semi_tone in range(min_transposition_subsequence,
-                                       max_transposition_subsequence + 1):
+                if include_transpositions:
+                    transposition = self.min_max_transposition(current_subseq_ranges)
+                    min_transposition_subsequence, max_transposition_subsequence = transposition
+                    transpositions = range(min_transposition_subsequence, max_transposition_subsequence + 1)
+                else:
+                    transpositions = range(1)
+
+                for semi_tone in transpositions:
                     start_tick = int(offsetStart * self.subdivision)
                     end_tick = int(offsetEnd * self.subdivision)
 

@@ -19,8 +19,6 @@ class MusicDataset(ABC):
 
     @property
     def cache_dir(self):
-        # folder = 'with_transpositions' if self.include_transpositions else 'without_transpositions'
-        # cache_dir = f'{os.path.expanduser("~")}/transformer-bach/data/{folder}/dataset_cache'
         cache_dir = f'{os.path.expanduser("~")}/transformer-bach/data/dataset_cache'
         return cache_dir
 

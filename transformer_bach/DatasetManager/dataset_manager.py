@@ -4,7 +4,7 @@ import music21
 
 from transformer_bach.DatasetManager.music_dataset import MusicDataset
 from transformer_bach.DatasetManager.chorale_dataset import ChoraleDataset, ChoraleBeatsDataset
-from transformer_bach.DatasetManager.helpers import NextChoralesIteratorGen
+from transformer_bach.DatasetManager.helpers import ChoralesIteratorGen
 
 # to use an existing dataset, add an entry in the all_datasets variable
 # and specify its base class and which music21 objects it uses
@@ -72,6 +72,7 @@ class DatasetManager:
              'corpus_it_gen': corpus_it_gen,
              })
         dataset = dataset_class_name(**kwargs)
+        print('filepath: ' + dataset.filepath(self.cache_dir))
         if os.path.exists(dataset.filepath(self.cache_dir)):
             print(f'Loading {dataset.__repr__()} from {dataset.filepath(self.cache_dir)}')
             dataset = torch.load(dataset.filepath(self.cache_dir))
@@ -88,8 +89,8 @@ class DatasetManager:
             tensor_dataset = dataset.get_tensor_dataset(self.cache_dir)
             # save all dataset parameters EXCEPT the tensor dataset
             # which is stored elsewhere
-            dataset.tensor_dataset = None
-            torch.save(dataset, dataset.filepath(cache_dir=self.cache_dir))
-            print(f'{dataset.__repr__()} saved in {dataset.filepath(cache_dir=self.cache_dir)}')
-            dataset.tensor_dataset = tensor_dataset
+            # dataset.tensor_dataset = None
+            # torch.save(dataset, dataset.filepath(cache_dir=self.cache_dir))
+            # print(f'{dataset.__repr__()} saved in {dataset.filepath(cache_dir=self.cache_dir)}')
+            # dataset.tensor_dataset = tensor_dataset
         return dataset

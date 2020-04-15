@@ -71,13 +71,12 @@ def standard_note(note_or_rest_string):
         return note.Note(note_or_rest_string)
 
 
-class NextChoralesIteratorGen:
-    def __init__(self, start_idx, end_idx):
-        self.start_idx = start_idx
-        self.end_idx = end_idx
+class ChoralesIteratorGen:
+    def __init__(self, picked_chorales):
+        self.picked_chorales = picked_chorales
 
     def __call__(self):
-        it = (chorale for chorale in islice(music21.corpus.chorales.Iterator(), self.start_idx, self.end_idx))
+        it = iter(self.picked_chorales)
         return it.__iter__()
 
 
