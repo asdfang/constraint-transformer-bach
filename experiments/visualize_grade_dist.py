@@ -14,16 +14,21 @@ from transformer_bach.utils import *
 from Grader.grader import FEATURES
 from Grader.helpers import get_threshold
 
-data_file='models/aug_gen_4-14/generations/update_grades.csv'
+model_dir='models/aug_bach_4-15'
 
 def main():
-    data_dict = read_update_data(data_file=data_file, feature='grade')
-    for it, grades in data_dict.items():
-        print(f'Iteration {it}: {np.sum([1 for grade in grades if grade == 33.270499749145515])} chorales with grade 33.270499749145515')
+    # data_dict = read_update_data(data_file=data_file, feature='grade')
+    # for it, grades in data_dict.items():
+    #     print(f'Iteration {it}: {np.sum([1 for grade in grades if grade == 33.270499749145515])} chorales with grade 33.270499749145515')
     
-    # plot_boxplot_per_iteration(data_file=data_file, threshold=-200)
-    # plot_histogram_per_iteration(data_file=data_file)
-    # plot_selections_per_iteration(data_file=data_file)
+    plot_boxplot_per_iteration(data_file=f'{model_dir}/update_grades.csv',
+                               plt_dir=f'{model_dir}/plots/',
+                               threshold=-200)
+    plot_histogram_per_iteration(data_file=f'{model_dir}/update_grades.csv',
+                                 plt_dir=f'{model_dir}/plots/',
+                                 threshold=-200)
+    plot_selections_per_iteration(data_file=f'{model_dir}/update_grades.csv',
+                                  plt_dir=f'{model_dir}/plots/')
 
 
 def plot_distributions(data_files=['results/bach_grades.csv', 'results/unconstrained_mock_grades.csv'],
@@ -112,7 +117,7 @@ def plot_boxplot_per_iteration(data_file='results/update_grades_over_bach_choral
 
 def plot_histogram_per_iteration(data_file, 
                                  feature='grade',
-                                 plot_dir='plots/augmented-generation/',
+                                 plt_dir='plots/augmented-generation/',
                                  threshold=None):
     """
     visualize model updates by plotting histogram for grade distribution at each iteration
@@ -129,13 +134,13 @@ def plot_histogram_per_iteration(data_file,
     
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.suptitle(f'{feature} distribution of generations at each iteration of training', fontsize=20)
-    ensure_dir(plot_dir)
-    plt.savefig(os.path.join(plot_dir, f'{feature}_update_dist.png'))
+    ensure_dir(plt_dir)
+    plt.savefig(os.path.join(plt_dir, f'{feature}_update_dist.png'))
     plt.close()
 
 
 def plot_selections_per_iteration(data_file='results/update_grades_over_bach_chorales.csv',
-                                  plot_dir='plots/augmented-generation/'):
+                                  plt_dir='plots/augmented-generation/'):
     """
     plot number of selections each iteration
     """
@@ -149,7 +154,7 @@ def plot_selections_per_iteration(data_file='results/update_grades_over_bach_cho
     plt.xlabel('Iteration')
     plt.ylabel('Number of selected generations')
     plt.title('Number of selected generations in each update iteration')
-    plt.savefig(os.path.join(plot_dir, 'selections_per_iteration.png'))
+    plt.savefig(os.path.join(plt_dir, 'selections_per_iteration.png'))
 
 
 def label_bars(rects):

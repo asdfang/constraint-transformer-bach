@@ -1,4 +1,5 @@
 import csv
+import random
 
 from transformer_bach.decoder_relative import TransformerBach
 from Grader.grader import Grader, FEATURES
@@ -9,10 +10,19 @@ from transformer_bach.small_bach_dataloader import SmallBachDataloaderGenerator
 
 def update_on_bach(transformer,
                    grader,
-                   update_iterations,
-                   generations_per_iteration,
-                   selections_per_iteration):
-    
+                   config,
+                   selections_per_iteration,
+                   bach_iterator,
+                   num_workers):    
+    # convert bach_iterator to list
+    bach_chorales = []
+    for _ in range(351):   
+        bach_chorales.append(next(bach_iterator))
+
+    update_iterations = config['update_iterations']
+    generations_per_iteration = config['generations_per_iteration']
+    dataloader_generator_kwargs = config['dataloader_generator_kwargs']
+
     update_file = open(f'{transformer.model_dir}/update_grades.csv', 'w')
     reader = csv.writer(update_file)
     reader.writerow(['iter', 'gen_id', 'grade'] + FEATURES)
@@ -26,15 +36,15 @@ def update_on_bach(transformer,
         ensure_dir(f'{transformer.model_dir}/update_generations/{i}/')
         picked_chorales = []
         scores = []
-        for _ in range(2):
+        for _ in range(5):
             scores_batch = transformer.generate(temperature=0.9,
                                                 top_p=0.8,
-                                                batch_size=generations_per_iteration // 2,
+                                                batch_size=generations_per_iteration // 5,
                                                 melody_constraint=None)
             scores.extend(scores_batch)
         
         for j, score in enumerate(scores):
-            score.write('midi', f'{transformer.model_dir}/generations/{i}/c{j}.mid')
+            score.write('midi', f'{transformer.model_dir}/update_generations/{i}/c{j}.mid')
             grade, chorale_vector = grader.grade_chorale(score)
             reader.writerow([i, j, grade, *chorale_vector])      # iteration, generation #, grade
             if grade > thres:
@@ -47,16 +57,14 @@ def update_on_bach(transformer,
         if selections_per_iteration[i] == 0:
             continue
         
-        bach_chorales = []
-        for _ in range(351):
-            bach_chorales.append(next(bach_dataloader_generator.dataset.iterator_gen()))
+        # randomly select chorales
         random.shuffle(bach_chorales)
         picked_bach_chorales = bach_chorales[:selections_per_iteration[i]]
 
         print('Creating dataset of Bach chorales')
         next_dataloader_generator = SmallBachDataloaderGenerator(
             sequences_size=dataloader_generator_kwargs['sequences_size'],
-            dataset_name=f'picked_generations_{i}',
+            dataset_name=f'picked_bach_{i}',
             chorales=picked_bach_chorales,
         )
         transformer.dataloader_generator = next_dataloader_generator   
@@ -64,17 +72,18 @@ def update_on_bach(transformer,
         print('Training model on dataset')
         transformer.train_model(batch_size=config['batch_size'],
                                 num_batches=config['num_batches'],
-                                num_epochs=config['num_epochs'],
+                                num_epochs=config['num_epochs_per_iteration'],
                                 lr=config['lr'],
                                 num_workers=num_workers)
 
 
 def update_on_generations(transformer, 
                           grader, 
-                          config):
+                          config,
+                          num_workers):
     update_iterations = config['update_iterations']
     generations_per_iteration = config['generations_per_iteration']
-    num_epochs_per_iteration = config['num_epochs_per_iteration']
+    dataloader_generator_kwargs = config['dataloader_generator_kwargs']
 
     update_file = open(f'{transformer.model_dir}/update_grades.csv', 'w')
     reader = csv.writer(update_file)
@@ -89,15 +98,15 @@ def update_on_generations(transformer,
         ensure_dir(f'{transformer.model_dir}/update_generations/{i}/')
         picked_chorales = []
         scores = []
-        for _ in range(2):
+        for _ in range(5):
             scores_batch = transformer.generate(temperature=0.9,
                                                 top_p=0.8,
-                                                batch_size=generations_per_iteration // 2,
+                                                batch_size=generations_per_iteration // 5,
                                                 melody_constraint=None)
             scores.extend(scores_batch)
         
         for j, score in enumerate(scores):
-            score.write('midi', f'{transformer.model_dir}/generations/{i}/c{j}.mid')
+            score.write('midi', f'{transformer.model_dir}/update_generations/{i}/c{j}.mid')
             grade, chorale_vector = grader.grade_chorale(score)
             reader.writerow([i, j, grade, *chorale_vector])      # iteration, generation #, grade
             if grade > thres:
@@ -112,7 +121,7 @@ def update_on_generations(transformer,
         print('Creating dataset of selected generations')
         next_dataloader_generator = SmallBachDataloaderGenerator(
             sequences_size=dataloader_generator_kwargs['sequences_size'],
-            dataset_name=f'picked_generations_{i}',
+            dataset_name=f'picked_mock_{i}',
             chorales=picked_chorales,
         )
         transformer.dataloader_generator = next_dataloader_generator            
@@ -120,6 +129,6 @@ def update_on_generations(transformer,
         print('Training model on dataset')
         transformer.train_model(batch_size=config['batch_size'],
                                 num_batches=config['num_batches'],
-                                num_epochs=config['num_epochs'],
+                                num_epochs=config['num_epochs_per_iteration'],
                                 lr=config['lr'],
                                 num_workers=num_workers)

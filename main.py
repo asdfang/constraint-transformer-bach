@@ -30,8 +30,10 @@ import music21
 @click.command()
 @click.option('--train', is_flag=True)
 @click.option('--load', is_flag=True)
-@click.option('--update', is_flag=True,
-              help='update the given model')
+@click.option('--update_bach', is_flag=True,
+              help='update the given model on Bach chorales')
+@click.option('--update_mock', is_flag=True,
+              help='update the given model on generations passing the threshold')
 @click.option('--generate', is_flag=True,
               help='generate from the given model')
 @click.option('--overfitted', is_flag=True, 
@@ -40,7 +42,8 @@ import music21
 @click.option('--num_workers', type=int, default=0)
 def main(train,
          load,
-         update,
+         update_bach,
+         update_mock,
          generate,
          overfitted,
          config,
@@ -129,10 +132,19 @@ def main(train,
     grader = Grader(dataset=bach_dataloader_generator.dataset,
                     features=FEATURES)
 
-    if update:
+    if update_mock:
         update_on_generations(transformer=transformer, 
                               grader=grader, 
-                              config=config)
+                              config=config,
+                              num_workers=num_workers)
+    
+    if update_bach:
+        update_on_bach(transformer=transformer,
+                       grader=grader,
+                       config=config,
+                       selections_per_iteration=[41,40,49,49,50,48,16,50,50,50],
+                       bach_iterator=bach_dataloader_generator.dataset.iterator_gen(),
+                       num_workers=num_workers)
     
     if generate:
         grade_unconstrained_mock(transformer=transformer, grader=grader)
