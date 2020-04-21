@@ -1,17 +1,30 @@
-# Transformer with constraints on Bach chorales
+# Augmentative Generation for Transformer Bach
 
 ## Usage
-A conda environment is provided in environment.yml. You can load it with
-`conda env create -f environment.yml`. The environment is named `public_transformer_bach` and you can activate it with `conda activate public_transformer_bach`.
+A conda environment is provided in `environment.yml`. Load it with `conda env create -f environment.yml`. The environment is named `tbach` and can be activated with `conda activate tbach`.
 
-Then you can run `python main.py --train --config=transformer_bach/bach_decoder_config.py`.
-On the first run, the dataset will be created in `$HOME/Data` and you may need to create this folder.
-When prompted for the creation of the index table of the dataset, enter `index`.
+Every time we run `main.py`, we can do any combination of three things:
+1. load a model with the `--load` flag
+2. train a model with the `--train` flag
+3. update a trained model with the `--update` flag
 
-After building the dataset (takes around 3 hours) training should start.
-Models are saved in the `models/` folder.
+Furthermore, we can generate from the final model with the `--generate` flag. 
 
-You can generate from a trained model with `python main.py --load --config=models/model_id/config.py -o`.
-The generations will be placed in the `models/model_id/generations` folder.
+On the first run, the dataset will need to be created in `data/`. After building the dataset, training should start. Models are saved in the `models/` folder. Generations are saved in the `models/model_id/generations` folder. 
 
-You choose to reharmonize different melodies by changing the `melody_constraint` variable at the end of `main.py`. Putting `melody_constraint=None` will generate a chorale from scratch.
+### Examples
+Train a base model on Bach chorales.
+```
+python main.py --train --config=transformer_bach/bach_decoder_config.py
+```
+
+Update a base model through augmentive generation. Suppose the base model is at `models/base`. We first need to make a copy of the model, then we can update the copied model.
+```
+cp -r models/base models/aug_gen
+python main.py --load --update --config=models/aug_gen/config.py
+```
+
+Generate some output from a trained model.
+```
+python mainm.py --load --generate --config=models/aug_gen/config.py
+```
