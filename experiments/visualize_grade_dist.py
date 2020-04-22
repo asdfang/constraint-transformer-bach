@@ -1,4 +1,6 @@
 import sys
+sys.path[0] += '/../'
+
 import csv, os
 from tqdm import tqdm
 import matplotlib.pyplot as plt, numpy as np
@@ -6,29 +8,25 @@ from music21 import converter
 import pandas as pd
 from itertools import chain
 
-sys.path[0] += '/../'
 from transformer_bach.DatasetManager.chorale_dataset import ChoraleDataset
 from transformer_bach.DatasetManager.dataset_manager import DatasetManager
 from transformer_bach.DatasetManager.metadata import FermataMetadata, TickMetadata, KeyMetadata
 from transformer_bach.utils import *
 from Grader.grader import FEATURES
 from Grader.helpers import get_threshold
+from experiments.helpers import label_bars, read_update_data
 
-model_dir='models/aug_bach_4-15'
+model_dir='models/aug_gen_4-21_method_5'
+
 
 def main():
-    # data_dict = read_update_data(data_file=data_file, feature='grade')
-    # for it, grades in data_dict.items():
-    #     print(f'Iteration {it}: {np.sum([1 for grade in grades if grade == 33.270499749145515])} chorales with grade 33.270499749145515')
-    
-    plot_boxplot_per_iteration(data_file=f'{model_dir}/update_grades.csv',
-                               plt_dir=f'{model_dir}/plots/',
-                               threshold=-200)
-    plot_histogram_per_iteration(data_file=f'{model_dir}/update_grades.csv',
-                                 plt_dir=f'{model_dir}/plots/',
-                                 threshold=-200)
-    plot_selections_per_iteration(data_file=f'{model_dir}/update_grades.csv',
-                                  plt_dir=f'{model_dir}/plots/')
+    data_file = f'{model_dir}/update_grades.csv'
+    plt_dir = f'{model_dir}/plots/'
+
+    plot_boxplot_per_iteration(data_file=data_file, plt_dir=plt_dir, threshold=-200)
+    plot_histogram_per_iteration(data_file=data_file, plt_dir=plt_dir, threshold=-200)
+    plot_selections_per_iteration(data_file=data_file, plt_dir=plt_dir)
+    plot_unique_per_iteration(data_file=data_file, plt_dir=plt_dir)
 
 
 def plot_distributions(data_files=['results/bach_grades.csv', 'results/unconstrained_mock_grades.csv'],
@@ -157,32 +155,19 @@ def plot_selections_per_iteration(data_file='results/update_grades_over_bach_cho
     plt.savefig(os.path.join(plt_dir, 'selections_per_iteration.png'))
 
 
-def label_bars(rects):
+def plot_unique_per_iteration(data_file, plt_dir):
     """
-    Attach a text label above each bar displaying its height
+    plot number of unique generations each iteration
     """
-    for rect in rects:
-        height = rect.get_height()
-        plt.text(rect.get_x() + rect.get_width()/2., 1.01*height,
-                '%d' % int(height),
-                ha='center', va='bottom')
-
-
-def read_update_data(data_file, feature, threshold=None):
-    """
-    Returns dictionary with iteration as key and list of grades/distances as value
-    """
-    df = pd.read_csv(data_file)
-    df = df.replace(float('-inf'), np.nan).dropna(subset=['grade'])
-    update_iterations = np.max([int(it) for it in df['iter']])
-    data_dict = {}
-    for it in range(update_iterations + 1):
-        grades = df.loc[df['iter'] == it][feature]
-        if threshold:
-            grades = [x for x in grades if x > threshold]
-        data_dict[it+1] = grades
-    
-    return data_dict
+    data_dict = read_update_data(data_file, feature='grade')
+    unique = [len(list(set(data))) for data in data_dict.values()]
+    plt.figure()
+    rects = plt.bar(range(1, len(unique)+1), unique)
+    label_bars(rects)
+    plt.xlabel('Iteration')
+    plt.ylabel('Number of unique generations')
+    plt.title('Number of unique generations in each update iteration')
+    plt.savefig(os.path.join(plt_dir, 'unique_per_iteration.png'))
 
 
 if __name__ == '__main__':

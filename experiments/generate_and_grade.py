@@ -1,7 +1,12 @@
 import csv
+from tqdm import tqdm
 
 from transformer_bach.decoder_relative import TransformerBach
 from Grader.grader import Grader, FEATURES
+from transformer_bach.constraint_helpers import score_to_hold_representation_for_voice
+from transformer_bach.utils import ensure_dir
+
+max_batch_size = 10
 
 
 def grade_bach(grader, 
@@ -32,7 +37,7 @@ def grade_bach(grader,
 
 def grade_unconstrained_mock(grader, 
                              transformer,
-                             grades_csv='tmp.csv',
+                             output_dir,
                              num_generations=1):
     """
     Arguments:
@@ -50,22 +55,31 @@ def grade_unconstrained_mock(grader,
     print('Generating and grading unconstrained mock chorales')
     mock_grades = []
     
-    ## TODO: call multiple times with batch_size of up to 25
-    for i in tqdm(range(num_generations)):
-        mock_score = transformer.generate(temperature=0.9,
-                                          top_p=0.8,
-                                          batch_size=1)[0]
-        # write mock_score to MIDI
-        output_dir = f'{transformer.model_dir}/unconstrained_mocks/'
+    # calculate batch sizes
+    batch_sizes = [max_batch_size]*(num_generations // max_batch_size)
+    if num_generations % max_batch_size != 0:
+        batch_sizes += [num_generations % max_batch_size]
+    
+    mock_scores = []
+    for i in tqdm(len(batch_sizes)):
+        score_batch = transformer.generate(temperature=0.9,
+                                           top_p=0.8,
+                                           batch_size=batch_sizes[i])
+        mock_scores.extend(score_batch)
+    
+    for score in mock_scores:
+        # write score to MIDI
+        if output_dir is None:
+            output_dir = f'{transformer.model_dir}/unconstrained_mocks/'
         ensure_dir(output_dir)
-        mock_score.write('midi', f'{output_dir}/{i}.mid')
+        score.write('midi', f'{output_dir}/{i}.mid')
         
         # grade chorale
-        grade, chorale_vector = grader.grade_chorale(mock_score)
+        grade, chorale_vector = grader.grade_chorale(score)
         mock_grades.append([grade, *chorale_vector])
     
     print('Writing data to csv file')
-    with open(f'{output_dir}/{grades_csv}', 'w') as chorale_file:
+    with open(f'{output_dir}/grades.csv', 'w') as chorale_file:
         reader = csv.writer(chorale_file)
         reader.writerow(['', 'grade'] + FEATURES)
         for i, grades in enumerate(mock_grades):
