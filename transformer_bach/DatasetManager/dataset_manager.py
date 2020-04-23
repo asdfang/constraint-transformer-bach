@@ -89,8 +89,8 @@ class DatasetManager:
             tensor_dataset = dataset.get_tensor_dataset(self.cache_dir)
             # save all dataset parameters EXCEPT the tensor dataset
             # which is stored elsewhere
-            # dataset.tensor_dataset = None
-            # torch.save(dataset, dataset.filepath(cache_dir=self.cache_dir))
-            # print(f'{dataset.__repr__()} saved in {dataset.filepath(cache_dir=self.cache_dir)}')
-            # dataset.tensor_dataset = tensor_dataset
+            dataset.tensor_dataset = None
+            torch.save(dataset, dataset.filepath(cache_dir=self.cache_dir))
+            print(f'{dataset.__repr__()} saved in {dataset.filepath(cache_dir=self.cache_dir)}')
+            dataset.tensor_dataset = tensor_dataset
         return dataset

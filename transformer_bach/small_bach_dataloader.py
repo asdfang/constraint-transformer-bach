@@ -11,11 +11,10 @@ metadatas = [
     TickMetadata(subdivision=subdivision),
     KeyMetadata()
 ]
-include_transpositions = True
 
 
 class SmallBachDataloaderGenerator(DataloaderGenerator):
-    def __init__(self, sequences_size, dataset_name, chorales):
+    def __init__(self, sequences_size, dataset_name, chorales, include_transpositions):
         dataset_manager = DatasetManager()
 
         chorale_dataset_kwargs = {
@@ -39,18 +38,14 @@ class SmallBachDataloaderGenerator(DataloaderGenerator):
 
         super(SmallBachDataloaderGenerator, self).__init__(dataset=dataset)
 
-    def dataloaders(self, batch_size, num_workers=0, shuffle_train=True,
-                    shuffle_val=False):
+    def dataloaders(self, batch_size, num_workers=0, shuffle=True):
         # discard metadata
         # and put num_channels (num_voices) at the last dimension
-        return [({'x': t[0].transpose(1, 2)}
-                 for t in dataloader)
-                for dataloader
-                in self.dataset.data_loaders(batch_size, num_workers=num_workers,
-                                             split=[1, 0],
-                                             shuffle_train=shuffle_train,
-                                             shuffle_val=shuffle_val
-                                             )]
+        dataloader = self.dataset.data_loaders(batch_size, 
+                                               num_workers=num_workers,
+                                               shuffle=shuffle,
+                                               )
+        return ({'x': t[0].transpose(1, 2)} for t in dataloader)
 
     def write(self, x, path):
         """

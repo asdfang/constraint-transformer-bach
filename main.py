@@ -11,21 +11,23 @@ import click
 import torch
 import random
 
-from transformer_bach.bach_dataloader import BachDataloaderGenerator
 from transformer_bach.small_bach_dataloader import SmallBachDataloaderGenerator
 from transformer_bach.decoder_relative import TransformerBach
 from transformer_bach.getters import get_data_processor
 from transformer_bach.melodies import MARIO_MELODY, TETRIS_MELODY, LONG_TETRIS_MELODY
 from transformer_bach.DatasetManager.helpers import load_or_pickle_distributions
-from transformer_bach.constraint_helpers import score_to_hold_representation_for_voice
 from transformer_bach.utils import ensure_dir
-from experiments.update_model import update_on_generations, update_on_bach
+from transformer_bach.DatasetManager.metadata import FermataMetadata, TickMetadata, KeyMetadata
+from transformer_bach.DatasetManager.chorale_dataset import ChoraleBeatsDataset
+from transformer_bach.DatasetManager.dataset_manager import DatasetManager
+from experiments.update_model import update_on_generations_method_2, update_on_generations_method_5, update_on_bach
 from experiments.generate_and_grade import grade_bach, grade_constrained_mock, grade_unconstrained_mock
 from Grader.grader import Grader, FEATURES
 from Grader.helpers import get_threshold
 from tqdm import tqdm
 
 import music21
+
 
 @click.command()
 @click.option('--train', is_flag=True)
@@ -72,14 +74,29 @@ def main(train,
         model_dir = f'models/{config["savename"]}_{timestamp}'
 
     # === Decoder ====
+    bach_dataset = [chorale for chorale in music21.corpus.chorales.Iterator() if len(chorale.parts) == 4]
+    num_examples = len(bach_dataset)
+    split = [0.8, 0.2]
+    train_dataset = islice(bach_dataset, 0, int(split[0] * num_examples))
+    val_dataset = islice(bach_dataset, int(split[0] * num_examples), num_examples)
     dataloader_generator_kwargs = config['dataloader_generator_kwargs']
-    bach_dataloader_generator = BachDataloaderGenerator(
+    
+    train_dataloader_generator = SmallBachDataloaderGenerator(
+        dataset_name='bach_train',
+        chorales=train_dataset,
         include_transpositions=dataloader_generator_kwargs['include_transpositions'],
-        sequences_size=dataloader_generator_kwargs['sequences_size']
+        sequences_size=dataloader_generator_kwargs['sequences_size'],
+    )
+
+    val_dataloader_generator = SmallBachDataloaderGenerator(
+        dataset_name='bach_val',
+        chorales=val_dataset,
+        include_transpositions=dataloader_generator_kwargs['include_transpositions'],
+        sequences_size=dataloader_generator_kwargs['sequences_size'],
     )
     
     data_processor = get_data_processor(
-        dataloader_generator=bach_dataloader_generator,
+        dataloader_generator=train_dataloader_generator,
         data_processor_type=config['data_processor_type'],
         data_processor_kwargs=config['data_processor_kwargs']
     )
@@ -90,7 +107,8 @@ def main(train,
     num_events = dataloader_generator_kwargs['sequences_size'] * 4
     transformer = TransformerBach(
         model_dir=model_dir,
-        dataloader_generator=bach_dataloader_generator,
+        train_dataloader_generator=train_dataloader_generator,
+        val_dataloader_generator=val_dataloader_generator,
         data_processor=data_processor,
         d_model=decoder_kwargs['d_model'],
         num_encoder_layers=decoder_kwargs['num_encoder_layers'],
@@ -127,27 +145,38 @@ def main(train,
             plot=True,
             num_workers=num_workers
         )
-
-    load_or_pickle_distributions(bach_dataloader_generator.dataset)
-    grader = Grader(dataset=bach_dataloader_generator.dataset,
+    
+    load_or_pickle_distributions(bach_dataset)
+    grader = Grader(dataset=bach_dataset,
                     features=FEATURES)
 
     if update_mock:
-        update_on_generations(transformer=transformer, 
-                              grader=grader, 
-                              config=config,
-                              num_workers=num_workers)
+        # update_on_generations_method_2(transformer=transformer, 
+        #                                grader=grader, 
+        #                                config=config,
+        #                                num_workers=num_workers,
+        #                                bach_iterator=bach_dataloader_generator.dataset.iterator_gen())
+        
+        update_on_generations_method_5(transformer=transformer,
+                                       grader=grader,
+                                       config=config,
+                                       num_workers=num_workers,
+                                       bach_iterator=train_dataloader_generator.dataset.iterator_gen(),
+                                       update_batch_size=50)
     
     if update_bach:
         update_on_bach(transformer=transformer,
                        grader=grader,
                        config=config,
                        selections_per_iteration=[41,40,49,49,50,48,16,50,50,50],
-                       bach_iterator=bach_dataloader_generator.dataset.iterator_gen(),
+                       bach_iterator=train_dataloader_generator.dataset.iterator_gen(),
                        num_workers=num_workers)
     
     if generate:
-        grade_unconstrained_mock(transformer=transformer, grader=grader)
+        grade_unconstrained_mock(transformer=transformer, 
+                                 grader=grader, 
+                                 output_dir=f'{transformer.model_dir}/unconstrained_mocks/0',
+                                 num_generations=50)
 
 
 if __name__ == '__main__':

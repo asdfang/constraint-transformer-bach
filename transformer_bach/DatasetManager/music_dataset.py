@@ -160,68 +160,30 @@ class MusicDataset(ABC):
     def filepath(self, cache_dir):
         return os.path.join(cache_dir, self.__repr__(), 'dataset')
 
-    def split_datasets(self, split=(0.85, 0.10), indexed_datasets=False):
-        assert sum(split) <= 1
-        dataset = self.get_tensor_dataset(self.cache_dir)
-        num_examples = len(dataset)
-        a, b = split
-        
-        val_dataset, eval_dataset = None, None
-
-        if indexed_datasets:
-            train_dataset = TensorDatasetIndexed(*dataset[: int(a * num_examples)])
-            if a < 1:
-                val_dataset = TensorDatasetIndexed(*dataset[int(a * num_examples): int((a + b) * num_examples)])
-            if a + b < 1:
-                eval_dataset = TensorDatasetIndexed(*dataset[int((a + b) * num_examples):])
-        else:
-            train_dataset = TensorDataset(*dataset[: int(a * num_examples)])
-            if a < 1:
-                val_dataset = TensorDataset(*dataset[int(a * num_examples): int((a + b) * num_examples)])
-            if a + b < 1:
-                eval_dataset = TensorDataset(*dataset[int((a + b) * num_examples):])
-        return train_dataset, val_dataset, eval_dataset
-
     def data_loaders(self, batch_size,
                      num_workers,
-                     split=(0.85, 0.10),
-                     shuffle_train=True,
-                     shuffle_val=False,
+                     shuffle=True,
                      indexed_dataloaders=False):
         """
-        Returns three data loaders obtained by splitting
-        self.tensor_dataset according to split
+        Returns dataloader for dataset
         :param batch_size:
         :param split:
         :return:
         """
-        train_dataset, val_dataset, eval_dataset = self.split_datasets(split=split,
-                                                                       indexed_datasets=indexed_dataloaders)
+        if indexed_dataloaders:
+            dataset = self.get_tensor_dataset(self.cache_dir)
+            dataset = TensorDatasetIndexed(*dataset)
+        else: 
+            dataset = self.get_tensor_dataset(self.cache_dir)
+            dataset = TensorDataset(*dataset)
 
-        train_dl = DataLoader(
-            train_dataset,
+        dl = DataLoader(
+            dataset,
             batch_size=batch_size,
-            shuffle=shuffle_train,
+            shuffle=shuffle,
             num_workers=num_workers,
             pin_memory=True,
             drop_last=True,
         )
 
-        val_dl = DataLoader(
-            val_dataset,
-            batch_size=batch_size,
-            shuffle=shuffle_val,
-            num_workers=num_workers,
-            pin_memory=True,
-            drop_last=True,
-        )
-
-        eval_dl = DataLoader(
-            eval_dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=num_workers,
-            pin_memory=True,
-            drop_last=True,
-        )
-        return train_dl, val_dl, eval_dl
+        return dl
