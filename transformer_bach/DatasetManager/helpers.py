@@ -89,31 +89,4 @@ class TensorDatasetIndexed(TensorDataset):
         return ret, index
 
 
-def load_or_pickle_distributions(dataset):
-    pickles_dir = f'{os.path.expanduser("~")}/transformer-bach/Grader/pickles/'
-    distributions_file = os.path.join(pickles_dir, 'bach_distributions.txt')
-    error_note_ratio_file =  os.path.join(pickles_dir, 'error_note_ratio.txt')
-    parallel_error_note_ratio_file =  os.path.join(pickles_dir, 'parallel_error_note_ratio.txt')
-    gaussian_file = os.path.join(pickles_dir, 'gaussian.txt')
 
-    if os.path.exists(distributions_file) and os.path.exists(error_note_ratio_file) and os.path.exists(
-            parallel_error_note_ratio_file) and os.path.exists(gaussian_file):
-        print('Loading Bach chorale distributions')
-        with open(distributions_file, 'rb') as fin:
-            dataset.distributions = pickle.load(fin)
-        with open(error_note_ratio_file, 'rb') as fin:
-            dataset.error_note_ratio = pickle.load(fin)
-        with open(parallel_error_note_ratio_file, 'rb') as fin:
-            dataset.parallel_error_note_ratio = pickle.load(fin)
-        with open(gaussian_file, 'rb') as fin:
-            dataset.gaussian = pickle.load(fin)
-    else:
-        dataset.calculate_distributions()
-        with open(distributions_file, 'wb') as fo:
-            pickle.dump(dataset.distributions, fo)
-        with open(error_note_ratio_file, 'wb') as fo:
-            pickle.dump(dataset.error_note_ratio, fo)
-        with open(parallel_error_note_ratio_file, 'wb') as fo:
-            pickle.dump(dataset.parallel_error_note_ratio, fo)
-        with open(gaussian_file, 'wb') as fo:
-            pickle.dump(dataset.gaussian, fo)

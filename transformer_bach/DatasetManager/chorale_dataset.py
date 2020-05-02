@@ -9,14 +9,10 @@ from collections import Counter
 from music21 import interval, stream
 from torch.utils.data import TensorDataset
 from tqdm import tqdm
-from sklearn.mixture import GaussianMixture
 
 from transformer_bach.DatasetManager.helpers import standard_name, SLUR_SYMBOL, START_SYMBOL, END_SYMBOL, \
     standard_note, OUT_OF_RANGE, REST_SYMBOL, PAD_SYMBOL
 from transformer_bach.DatasetManager.music_dataset import MusicDataset
-from Grader.compute_chorale_histograms import *	
-from Grader.distribution_helpers import *	
-from Grader.grader import Grader, FEATURES
 
 
 class ChoraleDataset(MusicDataset):
@@ -54,10 +50,6 @@ class ChoraleDataset(MusicDataset):
         self.subdivision = subdivision
         self.list_symbol_except_notes = [SLUR_SYMBOL, START_SYMBOL, END_SYMBOL, OUT_OF_RANGE,
                                          REST_SYMBOL, PAD_SYMBOL]
-        self.distributions = None	
-        self.error_note_ratio = None	
-        self.parallel_error_note_ratio = None	
-        self.gaussian = None
 
     def __repr__(self):
         return f'ChoraleDataset(' \
@@ -582,136 +574,6 @@ class ChoraleDataset(MusicDataset):
             # add part to score
             score.insert(part)
         return score
-    
-    def calculate_distributions(self):
-        print('Calculating ground-truth distributions over Bach chorales')
-
-        major_nh = Counter()            # notes (for chorales in major)
-        minor_nh = Counter()            # notes (for chorales in minor)
-        rh = Counter()                  # rhythm
-        major_hqh = Counter()           # harmonic quality
-        minor_hqh = Counter()
-        major_directed_ih = Counter()         # directed intervals for whole chorale
-        minor_directed_ih = Counter()
-        major_S_directed_ih = Counter()       # ... for soprano
-        minor_S_directed_ih = Counter()
-        major_A_directed_ih = Counter()       # ... for alto
-        minor_A_directed_ih = Counter()
-        major_T_directed_ih = Counter()       # ... for tenor
-        minor_T_directed_ih = Counter()
-        major_B_directed_ih = Counter()       # ... for bass
-        minor_B_directed_ih = Counter()
-        major_undirected_ih = Counter()       # undirected intervals for whole chorale
-        minor_undirected_ih = Counter()
-        major_S_undirected_ih = Counter()     # ... for soprano
-        minor_S_undirected_ih = Counter()
-        major_A_undirected_ih = Counter()     # ... for alto
-        minor_A_undirected_ih = Counter()
-        major_T_undirected_ih = Counter()     # ... for tenor
-        minor_T_undirected_ih = Counter()
-        major_B_undirected_ih = Counter()     # ... for bass
-        minor_B_undirected_ih = Counter()
-        eh = Counter()                  # errors (not including parallelism)
-        peh = Counter()                 # parallel errors (octaves and fifths)
-        num_notes = 0                   # number of notes
-
-        for chorale in tqdm(self.iterator_gen()):
-            key = chorale.analyze('key')
-            chorale_nh = get_note_histogram(chorale, key)
-            if key.mode == 'major':
-                # note histogram
-                major_nh += chorale_nh
-                # harmonic quality histogram
-                major_hqh += get_harmonic_quality_histogram(chorale)
-                # interval histograms
-                major_directed_ih += get_interval_histogram(chorale, directed=True)
-                major_S_directed_ih += get_SATB_interval_histogram(chorale, voice=0, directed=True)
-                major_A_directed_ih += get_SATB_interval_histogram(chorale, voice=1, directed=True)
-                major_T_directed_ih += get_SATB_interval_histogram(chorale, voice=2, directed=True)
-                major_B_directed_ih += get_SATB_interval_histogram(chorale, voice=3, directed=True)
-                major_undirected_ih += get_interval_histogram(chorale, directed=False)
-                major_S_undirected_ih += get_SATB_interval_histogram(chorale, voice=0, directed=False)
-                major_A_undirected_ih += get_SATB_interval_histogram(chorale, voice=1, directed=False)
-                major_T_undirected_ih += get_SATB_interval_histogram(chorale, voice=2, directed=False)
-                major_B_undirected_ih += get_SATB_interval_histogram(chorale, voice=3, directed=False)
-            else:
-                # note histogram
-                minor_nh += chorale_nh
-                # harmonic quality histogram
-                minor_hqh += get_harmonic_quality_histogram(chorale)
-                # interval histograms
-                minor_directed_ih += get_interval_histogram(chorale, directed=True)
-                minor_S_directed_ih += get_SATB_interval_histogram(chorale, voice=0, directed=True)
-                minor_A_directed_ih += get_SATB_interval_histogram(chorale, voice=1, directed=True)
-                minor_T_directed_ih += get_SATB_interval_histogram(chorale, voice=2, directed=True)
-                minor_B_directed_ih += get_SATB_interval_histogram(chorale, voice=3, directed=True)
-                minor_undirected_ih += get_interval_histogram(chorale, directed=False)
-                minor_S_undirected_ih += get_SATB_interval_histogram(chorale, voice=0, directed=False)
-                minor_A_undirected_ih += get_SATB_interval_histogram(chorale, voice=1, directed=False)
-                minor_T_undirected_ih += get_SATB_interval_histogram(chorale, voice=2, directed=False)
-                minor_B_undirected_ih += get_SATB_interval_histogram(chorale, voice=3, directed=False)
-
-            # rhythm histogram
-            rh += get_rhythm_histogram(chorale)
-            
-            # error histogram
-            eh += get_error_histogram(chorale, self.voice_ranges)
-            # parallel error histogram
-            peh += get_parallel_error_histogram(chorale)
-            # number of notes
-            num_notes += len(chorale.flat.notes)
-
-        # proportion of errors to notes
-        error_note_ratio = sum(eh.values()) / num_notes
-
-        # proportion of parallel errors to notes
-        parallel_error_note_ratio = sum(peh.values()) / num_notes
-
-        # convert histograms to distributions by normalizing
-        distributions = {'major_note_distribution': major_nh,
-                         'minor_note_distribution': minor_nh,
-                         'rhythm_distribution': rh,
-                         'major_harmonic_quality_distribution': major_hqh,
-                         'minor_harmonic_quality_distribution': minor_hqh,
-                         'major_directed_interval_distribution': major_directed_ih,
-                         'minor_directed_interval_distribution': minor_directed_ih,
-                         'major_S_directed_interval_distribution': major_S_directed_ih,
-                         'minor_S_directed_interval_distribution': minor_S_directed_ih,
-                         'major_A_directed_interval_distribution': major_A_directed_ih,
-                         'minor_A_directed_interval_distribution': minor_A_directed_ih,
-                         'major_T_directed_interval_distribution': major_T_directed_ih,
-                         'minor_T_directed_interval_distribution': minor_T_directed_ih,
-                         'major_B_directed_interval_distribution': major_B_directed_ih,
-                         'minor_B_directed_interval_distribution': minor_B_directed_ih,
-                         'major_undirected_interval_distribution': major_undirected_ih,
-                         'minor_undirected_interval_distribution': minor_undirected_ih,
-                         'major_S_undirected_interval_distribution': major_S_undirected_ih,
-                         'minor_S_undirected_interval_distribution': minor_S_undirected_ih,
-                         'major_A_undirected_interval_distribution': major_A_undirected_ih,
-                         'minor_A_undirected_interval_distribution': minor_A_undirected_ih,
-                         'major_T_undirected_interval_distribution': major_T_undirected_ih,
-                         'minor_T_undirected_interval_distribution': minor_T_undirected_ih,
-                         'major_B_undirected_interval_distribution': major_B_undirected_ih,
-                         'minor_B_undirected_interval_distribution': minor_B_undirected_ih,
-                         'error_distribution': eh,
-                         'parallel_error_distribution': peh}
-
-        for dist in distributions:
-            distributions[dist] = histogram_to_distribution(distributions[dist])
-
-        self.error_note_ratio = error_note_ratio
-        self.parallel_error_note_ratio = parallel_error_note_ratio
-        self.distributions = distributions
-
-        grader = Grader(dataset=self, features=FEATURES)
-
-        chorale_vectors = []
-        for chorale in tqdm(self.iterator_gen()):
-            chorale_vector = grader.get_feature_vector(chorale)
-            chorale_vectors.append(chorale_vector)
-
-        gm = GaussianMixture()
-        self.gaussian = gm.fit(chorale_vectors)
 
 
 # notes: all subsequences start on a beat
