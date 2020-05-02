@@ -172,10 +172,8 @@ class MusicDataset(ABC):
         """
         if indexed_dataloaders:
             dataset = self.get_tensor_dataset(self.cache_dir)
-            dataset = TensorDatasetIndexed(*dataset)
         else: 
             dataset = self.get_tensor_dataset(self.cache_dir)
-            dataset = TensorDataset(*dataset)
 
         dl = DataLoader(
             dataset,

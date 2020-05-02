@@ -61,13 +61,13 @@ def grade_unconstrained_mock(grader,
         batch_sizes += [num_generations % max_batch_size]
     
     mock_scores = []
-    for i in tqdm(len(batch_sizes)):
+    for i in tqdm(range(len(batch_sizes))):
         score_batch = transformer.generate(temperature=0.9,
                                            top_p=0.8,
                                            batch_size=batch_sizes[i])
         mock_scores.extend(score_batch)
     
-    for score in mock_scores:
+    for i, score in enumerate(mock_scores):
         # write score to MIDI
         if output_dir is None:
             output_dir = f'{transformer.model_dir}/unconstrained_mocks/'

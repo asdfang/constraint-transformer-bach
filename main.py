@@ -15,12 +15,10 @@ from transformer_bach.small_bach_dataloader import SmallBachDataloaderGenerator
 from transformer_bach.decoder_relative import TransformerBach
 from transformer_bach.getters import get_data_processor
 from transformer_bach.melodies import MARIO_MELODY, TETRIS_MELODY, LONG_TETRIS_MELODY
-from transformer_bach.DatasetManager.helpers import load_or_pickle_distributions
 from transformer_bach.utils import ensure_dir
-from transformer_bach.DatasetManager.metadata import FermataMetadata, TickMetadata, KeyMetadata
 from transformer_bach.DatasetManager.chorale_dataset import ChoraleBeatsDataset
 from transformer_bach.DatasetManager.dataset_manager import DatasetManager
-from experiments.update_model import update_on_generations_method_2, update_on_generations_method_5, update_on_bach
+from experiments.update_model import update_on_generations, update_on_generations_method_2, update_on_generations_method_5, update_on_bach, update_on_generations_method_4
 from experiments.generate_and_grade import grade_bach, grade_constrained_mock, grade_unconstrained_mock
 from Grader.grader import Grader, FEATURES
 from Grader.helpers import get_threshold
@@ -32,10 +30,8 @@ import music21
 @click.command()
 @click.option('--train', is_flag=True)
 @click.option('--load', is_flag=True)
-@click.option('--update_bach', is_flag=True,
-              help='update the given model on Bach chorales')
-@click.option('--update_mock', is_flag=True,
-              help='update the given model on generations passing the threshold')
+@click.option('--update', is_flag=True,
+              help='update with augmentive generation')
 @click.option('--generate', is_flag=True,
               help='generate from the given model')
 @click.option('--overfitted', is_flag=True, 
@@ -44,8 +40,7 @@ import music21
 @click.option('--num_workers', type=int, default=0)
 def main(train,
          load,
-         update_bach,
-         update_mock,
+         update,
          generate,
          overfitted,
          config,
@@ -74,13 +69,13 @@ def main(train,
         model_dir = f'models/{config["savename"]}_{timestamp}'
 
     # === Decoder ====
-    bach_dataset = [chorale for chorale in music21.corpus.chorales.Iterator() if len(chorale.parts) == 4]
+    bach_dataset = [chorale for chorale in music21.corpus.chorales.Iterator() if len(chorale.parts) == 4] # checking if valid
     num_examples = len(bach_dataset)
     split = [0.8, 0.2]
-    train_dataset = islice(bach_dataset, 0, int(split[0] * num_examples))
-    val_dataset = islice(bach_dataset, int(split[0] * num_examples), num_examples)
+    train_dataset = bach_dataset[:int(split[0] * num_examples)]
+    val_dataset = bach_dataset[int(split[0] * num_examples):]
     dataloader_generator_kwargs = config['dataloader_generator_kwargs']
-    
+
     train_dataloader_generator = SmallBachDataloaderGenerator(
         dataset_name='bach_train',
         chorales=train_dataset,
@@ -136,41 +131,38 @@ def main(train,
         shutil.copy(config_path, f'{model_dir}/config.py')
         transformer.to('cuda')
     
+    grader = Grader(
+        features=FEATURES,
+        iterator=bach_dataset,
+    )
+
     if train:        
         transformer.train_model(
-            batch_size=config['batch_size'],
-            num_batches=config['num_batches'],
-            num_epochs=config['num_epochs'],
-            lr=config['lr'],
-            plot=True,
-            num_workers=num_workers
-        )
-    
-    load_or_pickle_distributions(bach_dataset)
-    grader = Grader(dataset=bach_dataset,
-                    features=FEATURES)
+                batch_size=config['batch_size'],
+                num_batches=config['num_batches'],
+                num_epochs=config['num_epochs'],
+                lr=config['lr'],
+                plot=True,
+                num_workers=num_workers
+            )
 
-    if update_mock:
-        # update_on_generations_method_2(transformer=transformer, 
-        #                                grader=grader, 
-        #                                config=config,
-        #                                num_workers=num_workers,
-        #                                bach_iterator=bach_dataloader_generator.dataset.iterator_gen())
-        
-        update_on_generations_method_5(transformer=transformer,
-                                       grader=grader,
-                                       config=config,
-                                       num_workers=num_workers,
-                                       bach_iterator=train_dataloader_generator.dataset.iterator_gen(),
-                                       update_batch_size=50)
-    
-    if update_bach:
-        update_on_bach(transformer=transformer,
-                       grader=grader,
-                       config=config,
-                       selections_per_iteration=[41,40,49,49,50,48,16,50,50,50],
-                       bach_iterator=train_dataloader_generator.dataset.iterator_gen(),
-                       num_workers=num_workers)
+    if update:
+        # update_on_generations_method_4(
+        #     transformer=transformer, 
+        #     grader=grader,
+        #     config=config,
+        #     num_workers=num_workers,
+        #     bach_iterator=train_dataset,
+        # )
+
+        update_on_generations_method_5(
+            transformer=transformer,
+            grader=grader,
+            config=config,
+            num_workers=num_workers,
+            bach_iterator=train_dataset,
+            update_batch_size=50,
+        )
     
     if generate:
         grade_unconstrained_mock(transformer=transformer, 

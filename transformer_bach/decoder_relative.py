@@ -9,6 +9,7 @@ from transformer_bach.DatasetManager.helpers import PAD_SYMBOL, START_SYMBOL, EN
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import csv
 
 from transformer_bach.small_bach_dataloader import SmallBachDataloaderGenerator
 from transformer_bach.data_processor import DataProcessor
@@ -291,7 +292,7 @@ class TransformerBach(nn.Module):
             self.train()
         else:
             self.eval()
-
+        
         for sample_id, tensor_dict in tqdm(enumerate(islice(data_loader, num_batches)), ncols=80):
 
             # ==========================
@@ -311,7 +312,7 @@ class TransformerBach(nn.Module):
 
             # Monitored quantities
             monitored_quantities = forward_pass['monitored_quantities']
-
+            
             # average quantities
             if means is None:
                 means = {key: 0
@@ -341,9 +342,13 @@ class TransformerBach(nn.Module):
                     ):
         if plot:
             self.writer = SummaryWriter(f'{self.model_dir}')
+        
+        train_loss = []
+        val_loss = []
 
         best_val = 1e8
         self.init_optimizers(lr=lr)
+        print(f'Train for {num_epochs} epochs')
         for epoch_id in range(num_epochs):
             generator_train = self.train_dataloader_generator.dataloaders(
                 batch_size=batch_size,
@@ -354,7 +359,7 @@ class TransformerBach(nn.Module):
                 batch_size=batch_size,
                 num_workers=num_workers,
             )
-            
+
             monitored_quantities_train = self.epoch(
                 data_loader=generator_train,
                 train=True,
@@ -374,9 +379,11 @@ class TransformerBach(nn.Module):
             print(f'======= Epoch {epoch_id} =======')
             print(f'---Train---')
             dict_pretty_print(monitored_quantities_train, endstr=' ' * 5)
+            train_loss.append(monitored_quantities_train['loss'])
             print()
             print(f'---Val---')
             dict_pretty_print(monitored_quantities_val, endstr=' ' * 5)
+            val_loss.append(monitored_quantities_val['loss'])
             print('\n')
 
             self.save(early_stopped=False)
@@ -388,6 +395,11 @@ class TransformerBach(nn.Module):
                 self.plot(epoch_id,
                           monitored_quantities_train,
                           monitored_quantities_val)
+        
+        with open(f'{self.model_dir}/loss.csv', 'a') as fo:
+            writer = csv.writer(fo)
+            writer.writerow(['train_loss', 'val_loss'])
+            writer.writerows(zip(train_loss, val_loss))
 
     def plot(self, epoch_id, monitored_quantities_train,
              monitored_quantities_val):
@@ -442,7 +454,7 @@ class TransformerBach(nn.Module):
         # to score
         tensor_score = self.data_processor.postprocess(
             x.cpu().split(1, 0))
-        scores = self.dataloader_generator.to_score(tensor_score)
+        scores = self.train_dataloader_generator.to_score(tensor_score)
 
         # save scores in model_dir
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
@@ -528,7 +540,7 @@ class TransformerBach(nn.Module):
         # to score
         x = x[:, num_start_index:-num_start_index, :]                               # remove padding
         tensor_score = self.data_processor.postprocess(x.cpu().split(1, 0))         # convert from tensor to numpy array
-        scores = self.dataloader_generator.to_score(tensor_score)
+        scores = self.train_dataloader_generator.to_score(tensor_score)
 
         for score in scores:
             self.trim_generated_chorale(score)
@@ -536,9 +548,9 @@ class TransformerBach(nn.Module):
         return scores
 
     def init_generation_chorale(self, num_events, start_index, melody_constraint=None):
-        PAD = [d[PAD_SYMBOL] for d in self.dataloader_generator.dataset.note2index_dicts]
-        START = [d[START_SYMBOL] for d in self.dataloader_generator.dataset.note2index_dicts]
-        END = [d[END_SYMBOL] for d in self.dataloader_generator.dataset.note2index_dicts]
+        PAD = [d[PAD_SYMBOL] for d in self.train_dataloader_generator.dataset.note2index_dicts]
+        START = [d[START_SYMBOL] for d in self.train_dataloader_generator.dataset.note2index_dicts]
+        END = [d[END_SYMBOL] for d in self.train_dataloader_generator.dataset.note2index_dicts]
         aa = torch.Tensor(PAD).unsqueeze(0).unsqueeze(0).repeat(1, start_index - 1, 1).long()
         bb = torch.Tensor(START).unsqueeze(0).unsqueeze(0).long().repeat(1, num_events - 2 * start_index + 1, 1).long()
         cc = torch.Tensor(END).unsqueeze(0).unsqueeze(0).long()
@@ -550,7 +562,7 @@ class TransformerBach(nn.Module):
         masked_positions[:, -start_index:, :] = 0
 
         if melody_constraint is not None:
-            MELODY_CONSTRAINT = [self.dataloader_generator.dataset.note2index_dicts[0][note]
+            MELODY_CONSTRAINT = [self.train_dataloader_generator.dataset.note2index_dicts[0][note]
                                  for note in melody_constraint]
             for i in range(num_events - 2 * start_index):
                 init_sequence[:, i + start_index, 0] = MELODY_CONSTRAINT[i]

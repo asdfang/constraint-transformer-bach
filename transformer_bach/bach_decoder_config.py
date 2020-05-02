@@ -26,19 +26,21 @@ config = {
         positional_embedding_size=8,
         dropout=0.1,
     ),
-    # ======== Training ========
-    'lr':                          1e-5,
-    'batch_size':                  8,
-    'num_batches':                 2048,
-    'num_epochs':                  10,
 
     # ======== model ID ========
     'timestamp':                   None,
     'savename':                    Path(__file__).stem,
 
+    # ======== Training ========
+    'lr':                          1e-5,
+    'batch_size':                  8,
+    'num_batches':                 2048,
+    'num_epochs':                  1,
+
     # ======== Update ========
-    'update_iterations':           10,
+    'update_iterations':           49,
     'generations_per_iteration':   50,
-    'update_epochs':               100,
     'update_lr':                   1e-5,
+    'update_num_batches':          2048,
+    'update_epochs':               1,
 }
