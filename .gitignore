@@ -99,8 +99,6 @@ ENV/
 
 # local files
 .idea/
-Grader/pickles/**
-generations/**
 models/**
 data/**
 
