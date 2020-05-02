@@ -16,15 +16,15 @@ from Grader.grader import FEATURES
 from Grader.helpers import get_threshold
 from experiments.helpers import label_bars, read_update_data
 
-model_dir='models/aug_gen_4-21_method_5'
+model_dir='models/aug_gen_m4_5-1'
 
 
 def main():
     data_file = f'{model_dir}/update_grades.csv'
     plt_dir = f'{model_dir}/plots/'
 
-    plot_boxplot_per_iteration(data_file=data_file, plt_dir=plt_dir, threshold=-200)
-    plot_histogram_per_iteration(data_file=data_file, plt_dir=plt_dir, threshold=-200)
+    plot_boxplot_per_iteration(data_file=data_file, plt_dir=plt_dir, threshold=-100)
+    # plot_histogram_per_iteration(data_file=data_file, plt_dir=plt_dir)
     plot_selections_per_iteration(data_file=data_file, plt_dir=plt_dir)
     plot_unique_per_iteration(data_file=data_file, plt_dir=plt_dir)
 
@@ -105,6 +105,7 @@ def plot_boxplot_per_iteration(data_file='results/update_grades_over_bach_choral
     plt.xlabel('Iteration')
     plt.title(f'{feature} distribution of generations after each update iteration')
     plt.ylabel(feature)
+    plt.ylim([threshold, 50])
     
     thres = get_threshold(feature=feature)
     plt.axhline(y=thres, color='steelblue', linestyle='-')
