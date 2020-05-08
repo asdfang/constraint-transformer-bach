@@ -11,6 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import csv
 
+from transformer_bach.utils import ensure_dir
 from transformer_bach.small_bach_dataloader import SmallBachDataloaderGenerator
 from transformer_bach.data_processor import DataProcessor
 from transformer_bach.transformer_custom import TransformerEncoderLayerCustom, \
@@ -145,11 +146,14 @@ class TransformerBach(nn.Module):
     def __repr__(self):
         return 'DecoderRelative'
 
-    def save(self, early_stopped):
+    def save(self, early_stopped, epoch=None):
         if early_stopped:
             model_dir = f'{self.model_dir}/early_stopped'
         else:
             model_dir = f'{self.model_dir}/overfitted'
+        
+        if epoch:
+            model_dir = f'{self.model_dir}/checkpoints/epoch-{epoch}'
 
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
@@ -342,22 +346,20 @@ class TransformerBach(nn.Module):
                     ):
         if plot:
             self.writer = SummaryWriter(f'{self.model_dir}')
-        
-        train_loss = []
-        val_loss = []
 
-        best_val = 1e8
         self.init_optimizers(lr=lr)
         print(f'Train for {num_epochs} epochs')
         for epoch_id in range(num_epochs):
             generator_train = self.train_dataloader_generator.dataloaders(
                 batch_size=batch_size,
                 num_workers=num_workers,
+                shuffle=True,
             )
 
             generator_val = self.val_dataloader_generator.dataloaders(
                 batch_size=batch_size,
                 num_workers=num_workers,
+                shuffle=True,
             )
 
             monitored_quantities_train = self.epoch(
@@ -374,32 +376,23 @@ class TransformerBach(nn.Module):
             )
             del generator_val
 
-            valid_loss = monitored_quantities_val['loss']
+            train_loss = monitored_quantities_train['loss']
+            val_loss = monitored_quantities_val['loss']
 
             print(f'======= Epoch {epoch_id} =======')
             print(f'---Train---')
             dict_pretty_print(monitored_quantities_train, endstr=' ' * 5)
-            train_loss.append(monitored_quantities_train['loss'])
             print()
             print(f'---Val---')
             dict_pretty_print(monitored_quantities_val, endstr=' ' * 5)
-            val_loss.append(monitored_quantities_val['loss'])
             print('\n')
-
-            self.save(early_stopped=False)
-            if valid_loss < best_val:
-                self.save(early_stopped=True)
-                best_val = valid_loss
 
             if plot:
                 self.plot(epoch_id,
                           monitored_quantities_train,
                           monitored_quantities_val)
         
-        with open(f'{self.model_dir}/loss.csv', 'a') as fo:
-            writer = csv.writer(fo)
-            writer.writerow(['train_loss', 'val_loss'])
-            writer.writerows(zip(train_loss, val_loss))
+        return train_loss, val_loss
 
     def plot(self, epoch_id, monitored_quantities_train,
              monitored_quantities_val):

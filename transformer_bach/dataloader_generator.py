@@ -10,6 +10,6 @@ class DataloaderGenerator:
         self.dataset = dataset
 
     def dataloaders(self, batch_size, num_workers=0, shuffle_train=True,
-                    shuffle_val=False):
+                    shuffle_val=True):
         raise NotImplementedError
 

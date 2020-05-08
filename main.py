@@ -5,33 +5,35 @@ import importlib
 import os
 import shutil
 from datetime import datetime
+import pytz
 import csv
 from itertools import islice
 import click
 import torch
 import random
+from tqdm import tqdm
+import music21
 
 from transformer_bach.small_bach_dataloader import SmallBachDataloaderGenerator
 from transformer_bach.decoder_relative import TransformerBach
 from transformer_bach.getters import get_data_processor
 from transformer_bach.melodies import MARIO_MELODY, TETRIS_MELODY, LONG_TETRIS_MELODY
-from transformer_bach.utils import ensure_dir
+from transformer_bach.utils import ensure_dir, seed
 from transformer_bach.DatasetManager.chorale_dataset import ChoraleBeatsDataset
 from transformer_bach.DatasetManager.dataset_manager import DatasetManager
-from experiments.update_model import update_on_generations, update_on_generations_method_2, update_on_generations_method_5, update_on_bach, update_on_generations_method_4
+from experiments.update_model import augmentative_generation
 from experiments.generate_and_grade import grade_bach, grade_constrained_mock, grade_unconstrained_mock
 from Grader.grader import Grader, FEATURES
 from Grader.helpers import get_threshold
-from tqdm import tqdm
-
-import music21
 
 
 @click.command()
 @click.option('--train', is_flag=True)
 @click.option('--load', is_flag=True)
-@click.option('--update', is_flag=True,
-              help='update with augmentive generation')
+@click.option('--aug_gen', is_flag=True,
+              help='augmentive generation')
+@click.option('--base', is_flag=True,
+              help='train with threshold of +inf')
 @click.option('--generate', is_flag=True,
               help='generate from the given model')
 @click.option('--overfitted', is_flag=True, 
@@ -40,7 +42,8 @@ import music21
 @click.option('--num_workers', type=int, default=0)
 def main(train,
          load,
-         update,
+         aug_gen,
+         base,
          generate,
          overfitted,
          config,
@@ -55,11 +58,14 @@ def main(train,
     config_module_name = os.path.splitext(config)[0].replace('/', '.')
     config = importlib.import_module(config_module_name).config
 
+    # set random seed
+    seed(config['random_seed'])
+    
     # compute time stamp
     if config['timestamp'] is not None:
         timestamp = config['timestamp']
     else:
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%m-%d_%H:%M')
         config['timestamp'] = timestamp
 
     # set model_dir
@@ -77,14 +83,14 @@ def main(train,
     dataloader_generator_kwargs = config['dataloader_generator_kwargs']
 
     train_dataloader_generator = SmallBachDataloaderGenerator(
-        dataset_name='bach_train',
+        dataset_name='bach_train_for_aug_gen',
         chorales=train_dataset,
         include_transpositions=dataloader_generator_kwargs['include_transpositions'],
         sequences_size=dataloader_generator_kwargs['sequences_size'],
     )
 
     val_dataloader_generator = SmallBachDataloaderGenerator(
-        dataset_name='bach_val',
+        dataset_name='bach_val_for_aug_gen',
         chorales=val_dataset,
         include_transpositions=dataloader_generator_kwargs['include_transpositions'],
         sequences_size=dataloader_generator_kwargs['sequences_size'],
@@ -123,13 +129,16 @@ def main(train,
         else:
             transformer.load(early_stopped=True)
         transformer.to('cuda')
-
-    # Copy .py config file in the save directory before training
+    
+    # copy .py config file and create README in the model directory before training
     if not load:
-        if not os.path.exists(model_dir):
-            os.makedirs(model_dir)
+        ensure_dir(model_dir)
         shutil.copy(config_path, f'{model_dir}/config.py')
         transformer.to('cuda')
+
+        with open(f'{model_dir}/README.txt', 'w') as readme:
+            readme.write(config['description'])
+            readme.close()
     
     grader = Grader(
         features=FEATURES,
@@ -146,29 +155,37 @@ def main(train,
                 num_workers=num_workers
             )
 
-    if update:
-        # update_on_generations_method_4(
-        #     transformer=transformer, 
-        #     grader=grader,
-        #     config=config,
-        #     num_workers=num_workers,
-        #     bach_iterator=train_dataset,
-        # )
-
-        update_on_generations_method_5(
-            transformer=transformer,
+    if aug_gen:
+        # method 4: update on generations, with threshold of median Bach chorale grade
+        augmentative_generation(
+            transformer=transformer, 
             grader=grader,
             config=config,
             num_workers=num_workers,
             bach_iterator=train_dataset,
-            update_batch_size=50,
+        )
+
+    if base:
+        # base model
+        augmentative_generation(
+            transformer=transformer, 
+            grader=grader,
+            config=config,
+            num_workers=num_workers,
+            bach_iterator=train_dataset,
+            threshold=float('inf')
         )
     
     if generate:
-        grade_unconstrained_mock(transformer=transformer, 
-                                 grader=grader, 
-                                 output_dir=f'{transformer.model_dir}/unconstrained_mocks/0',
-                                 num_generations=50)
+        # grade_unconstrained_mock(transformer=transformer, 
+        #                          grader=grader, 
+        #                          num_generations=351)
+        
+        grade_constrained_mock(
+            transformer=transformer,
+            grader=grader,
+            bach_iterator=bach_dataset[:5],
+        )
 
 
 if __name__ == '__main__':

@@ -72,11 +72,11 @@ def standard_note(note_or_rest_string):
 
 
 class ChoralesIteratorGen:
-    def __init__(self, picked_chorales):
-        self.picked_chorales = picked_chorales
+    def __init__(self, chorales):
+        self.chorales = chorales
 
     def __call__(self):
-        it = iter(self.picked_chorales)
+        it = iter(self.chorales)
         return it.__iter__()
 
 

@@ -7,6 +7,9 @@ from music21 import converter
 from scipy.stats import wasserstein_distance
 from tqdm import tqdm
 from sklearn.mixture import GaussianMixture
+import pickle
+import os
+from collections import Counter
 
 from Grader.distribution_helpers import *
 from Grader.compute_chorale_histograms import *
@@ -108,6 +111,7 @@ class Grader:
         peh = Counter()                 # parallel errors (octaves and fifths)
         num_notes = 0                   # number of notes
 
+        print('Calculating feature distributions for Bach chorales')
         for chorale in tqdm(self.iterator):
             key = chorale.analyze('key')
             chorale_nh = get_note_histogram(chorale, key)
@@ -197,6 +201,7 @@ class Grader:
         self.distributions = distributions
 
         chorale_vectors = []
+        print('Calculating Gaussian')
         for chorale in tqdm(self.iterator):
             chorale_vector = self.get_feature_vector(chorale)
             chorale_vectors.append(chorale_vector)

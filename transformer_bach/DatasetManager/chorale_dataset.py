@@ -72,7 +72,7 @@ class ChoraleDataset(MusicDataset):
         # Compute or load index dict
         # input "index" to use this dataset as a reference
         # input "y" to first compute the standardized dataset
-        # normal first usage is "y" then "index
+        # normal first usage is "y" then "index"
         if not os.path.exists(index_dict_dir):
             os.mkdir(index_dict_dir)
         if not os.path.isfile(index_dict_path):
