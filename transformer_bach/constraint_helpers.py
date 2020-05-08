@@ -41,3 +41,17 @@ def score_to_hold_representation_for_voice(score, voice=0):
     returns a list that represents the specified part given by the voice index in hold representation
     """
     return single_part_to_hold_representation(score.parts[voice])
+
+def score_to_hold_representation(score):
+    """
+    Arguments
+        score: music21.stream.Score – probably a Bach chorale.
+    
+    returns a 2-D, first axis represents which voice (0 is soprano), second axis has hold representation
+    """
+    full_hold_score = []
+
+    for i in range(4):
+        full_hold_score.append(score_to_hold_representation_for_voice(score, voice=i))
+    
+    return full_hold_score
