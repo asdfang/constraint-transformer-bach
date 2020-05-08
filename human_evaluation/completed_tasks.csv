@@ -1,4 +1,0 @@
-task_id,background,1,2,3,4,5,6,7,8,9,10,is_bach1,is_bach2,is_bach3,is_bach4,is_bach5,is_bach6,is_bach7,is_bach8,is_bach9,is_bach10,accuracy
-2,1,a,a,a,a,a,b,b,b,b,b,a,b,b,b,a,a,b,a,a,b,0.4
-3,_,_,_,_,_,_,_,_,_,_,_,a,a,a,b,a,b,b,b,b,b,0.0
-4,1,b,a,_,b,_,b,_,_,_,b,b,b,a,b,a,a,a,a,a,b,0.3
