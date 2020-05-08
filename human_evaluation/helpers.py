@@ -21,10 +21,10 @@ IDX_TO_COMPARISON = {
 
 CSV = {
     'tasks': 'human_evaluation/data/tasks.csv',
-    'a_pairs': 'human_evaluation/data/aug-gen_bach_pairs.csv',
-    'b_pairs': 'human_evaluation/data/base_bach_pairs.csv',
+    'a_pairs': 'human_evaluation/data/bach_aug-gen_pairs.csv',
+    'b_pairs': 'human_evaluation/data/bach_base_pairs.csv',
     'c_pairs': 'human_evaluation/data/aug-gen_base_pairs.csv',
-    'd_pairs': 'human_evaluation/data/bad_bach_pairs.csv',
+    'd_pairs': 'human_evaluation/data/bach_bad_pairs.csv',
     'completed_tasks': 'human_evaluation/data/completed_tasks.csv',
     'completed_a_pairs': 'human_evaluation/data/completed_aug-gen_bach_pairs.csv',
     'completed_b_pairs': 'human_evaluation/data/completed_base_bach_pairs.csv',
