@@ -6,7 +6,7 @@ from Grader.grader import Grader, FEATURES
 from transformer_bach.constraint_helpers import score_to_hold_representation_for_voice
 from transformer_bach.utils import ensure_dir
 
-max_batch_size = 10
+max_batch_size = 25
 
 
 def grade_bach(grader, 
@@ -37,7 +37,7 @@ def grade_bach(grader,
 
 def grade_unconstrained_mock(grader, 
                              transformer,
-                             output_dir,
+                             output_dir=None,
                              num_generations=1):
     """
     Arguments:
@@ -88,8 +88,8 @@ def grade_unconstrained_mock(grader,
 
 def grade_constrained_mock(grader,
                            transformer,
-                           grades_csv='tmp.csv',
-                           bach_iterator=None
+                           output_dir=None,
+                           bach_iterator=None,
                            ):
     """
     Arguments:
@@ -123,7 +123,8 @@ def grade_constrained_mock(grader,
             continue
         
         # write mock_score to MIDI
-        output_dir = f'{transformer.model_dir}/constrained_mocks/'
+        if output_dir is None:
+            output_dir = f'{transformer.model_dir}/constrained_mocks/'
         ensure_dir(output_dir)
         mock_score.write('midi', f'{output_dir}/{i}.mid')
         
@@ -132,7 +133,7 @@ def grade_constrained_mock(grader,
         mock_grades.append([grade, *chorale_vector])
 
     print('Writing data to csv file')
-    with open(f'{output_dir}/grades_csv', 'w') as chorale_file:
+    with open(f'{output_dir}/grades.csv', 'w') as chorale_file:
         reader = csv.writer(chorale_file)
         reader.writerow(['', 'grade'] + FEATURES)
         for i, grades in enumerate(mock_grades):
