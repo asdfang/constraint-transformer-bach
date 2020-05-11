@@ -1,4 +1,9 @@
 """
+Overwrites human_evaluation/data/completed_tasks.csv
+
+USAGE:
+python human_evaluation/process_completions.py
+
 This file and web server are on different servers, so we'll have to copy over the completions dir to this server.
 """
 import sys
@@ -25,11 +30,11 @@ def main():
     with open(CSV['completed_tasks'], 'w') as completed_tasks: 
         completed_tasks_writer = csv.writer(completed_tasks)
         ptq_labels = [f'ptq{i}' for i in range(1, NUM_PRETEST_QUESTIONS + 1)]
-        q_labels = [i for i in range(1, NUM_PAIRS_PER_TASK + 1)]
+        q_labels = [f'q{i}' for i in range(1, NUM_PAIRS_PER_TASK + 1)]
         p1_answers = [f'bach_is{i}' for i in range(1, 8)]
         p2_answers = [f'aug-gen_is{i}' for i in range(8,11)]
         headers = ptq_labels + q_labels + p1_answers + p2_answers
-        completed_tasks_writer.writerow(['task_id','points_on_pretest','background',*headers,
+        completed_tasks_writer.writerow(['task_id','background',*headers,
                                          'listening','part1_accuracy','time'])
         completed_tasks_writer.writerows(rows)
 
@@ -38,30 +43,15 @@ def _grade_pretest(completion_dict):
     """
     completion_dict must have keys 'ptq{1-5}'
     """
-    points = 0.0
-    if completion_dict['ptq1'] == 'b':
-        points += 1
-    if completion_dict['ptq2'] == 'b':
-        points += 1
-    if completion_dict['ptq3'] == 'a':
-        points += 1
-    if completion_dict['ptq4'] == 'd':
-        points += 1
-    elif completion_dict['ptq4'] == 'c':
-        points += 0.5
-    if completion_dict['ptq5'] == 'c':
-        points += 1
-
-    return points
-
-def _calculate_background(points_on_pretest):
-    assert points_on_pretest >= 0 and points_on_pretest <= 5 and points_on_pretest % 0.5 == 0
-    if points_on_pretest <= 2.5:
+    key = pd.read_csv('human_evaluation/data/pre-test_key.csv')['answer']
+    
+    if np.sum([completion_dict[f'ptq{i}'] == key[i-1] for i in [1, 2, 3]]) < 3:
         return 1
-    elif points_on_pretest <= 4:
+    elif np.sum([completion_dict[f'ptq{i}'] == key[i-1] for i in [4, 5]]) < 2:
         return 2
-    else:
+    else: 
         return 3
+
 
 def parse_completion(completion_json_path):
     """
@@ -89,8 +79,7 @@ def parse_completion(completion_json_path):
             continue
         completion[res['from_name']] = res['value']['choices'][0][0]
 
-    completion['points_on_pretest'] = _grade_pretest(completion)
-    completion['background'] = _calculate_background(completion['points_on_pretest'])
+    completion['background'] = _grade_pretest(completion)
 
     return completion
 
@@ -113,8 +102,8 @@ def completion_dict_to_row(completion):
     correct_ct = 0
     keys = []
     for question_id in range(1, NUM_PAIRS_PER_TASK + 1):
-        pick = completion[str(question_id)]
-        pair_id = tasks_df.at[task_id, str(question_id)]
+        pick = completion[f'q{question_id}']
+        pair_id = tasks_df.at[task_id, f'q{question_id}']
         comparison_idx = pair_id.split('_')[0]
         idx = int(pair_id.split('_')[1])
         pair_row = pairs_df_dict[comparison_idx].iloc[idx]
@@ -129,8 +118,8 @@ def completion_dict_to_row(completion):
     
     acc = correct_ct / 7
     pretest_answers = [completion[f'ptq{i}'] for i in range(1, NUM_PRETEST_QUESTIONS + 1)]
-    test_answers = [completion[str(i)] for i in range(1, NUM_PAIRS_PER_TASK + 1)]
-    row = [task_id, completion['points_on_pretest'], completion['background'], *pretest_answers, *test_answers, 
+    test_answers = [completion[f'q{i}'] for i in range(1, NUM_PAIRS_PER_TASK + 1)]
+    row = [task_id, completion['background'], *pretest_answers, *test_answers, 
            *keys, listening, acc, completion['time']]
 
     return row

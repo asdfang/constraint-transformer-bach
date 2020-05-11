@@ -1,5 +1,9 @@
 """
-From tasks, {a,b,c,d}_pairs, write a file called 'tasks.json' in human_evaluation/
+write 'human_evaluation/data/tasks.json' in label-studio's format
+from tasks.csv and *_pairs.csv.
+
+USAGE (from transformer-bach/):
+python human_evaluation/convert_to_tasks_json.py
 """
 import sys
 sys.path.insert(0, '../')
@@ -37,8 +41,8 @@ for index, task_row in tqdm(tasks.iterrows()): # for each task
     task_id = int(task_row['task_id'])
 
     for i in range(NUM_PAIRS_PER_TASK): # for each pair in the current task
-        pair = task_row[i+1] # task_ids are 1-indexed
-        pair_idx, pair_row_num = task_row[i+1].split('_')
+        pair = task_row[f'q{i+1}'] # q's are 1-indexed
+        pair_idx, pair_row_num = pair.split('_')
         pair_row_num = int(pair_row_num)
         pair_row = pairs[pair_idx].iloc[pair_row_num] # get row in correct csv file
 
@@ -52,6 +56,7 @@ for index, task_row in tqdm(tasks.iterrows()): # for each task
         data['urlpt5'] = AUDIO_DIRS['pretest'] + "q5.mp3"
 
         # order A and B correctly...
+        # url's are 0-indexed...
         if pair_idx == 'a': # aug-gen vs. bach
             if pair_row['bach_is'] == 'a':
                 data['url'+str(i)+'a'] = AUDIO_DIRS['bach'] + str(pair_row['bach_id']) + '.mp3'
@@ -84,9 +89,10 @@ for index, task_row in tqdm(tasks.iterrows()): # for each task
     task_json['id'] = task_id
     task_json['data'] = data
     all_tasks_json[str(task_id)] = task_json
+    break
 
-
-with open('human_evaluation/tasks.json', 'w') as f:
-    s = json.dumps(all_tasks_json, indent=4)
-    f.write(s)
-    f.close()
+# with open('human_evaluation/data/tasks.json', 'w') as f:
+#     # s = json.dumps(all_tasks_json, indent=4)
+#     s = json.dumps(all_tasks_json)
+#     f.write(s)
+#     f.close()

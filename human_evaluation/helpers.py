@@ -3,7 +3,7 @@ import music21
 NUM_PAIRS_PER_TASK = 10
 NUM_PRETEST_QUESTIONS = 5
 MODELS = ['base', 'bach', 'aug-gen']
-NUM_TASKS = 10000
+NUM_TASKS = 2000
 
 MODEL_TO_IDX = {
     'bach': 0,
@@ -33,11 +33,16 @@ CSV = {
 }
 
 AUDIO_DIRS = {
-    'bach': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["bach"]}/',
-    'aug-gen': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["aug-gen"]}/',
-    'base': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["base"]}/',
-    'bad': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["bad"]}/',
-    'pretest': 'http://cortex.cs.northwestern.edu:8200/static/audio/pretest/',
+    # 'bach': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["bach"]}/',
+    # 'aug-gen': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["aug-gen"]}/',
+    # 'base': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["base"]}/',
+    # 'bad': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["bad"]}/',
+    # 'pretest': 'http://cortex.cs.northwestern.edu:8200/static/audio/pretest/',
+    'bach': f'/upload/audio/{MODEL_TO_IDX["bach"]}/',
+    'aug-gen': f'/upload/audio/{MODEL_TO_IDX["aug-gen"]}/',
+    'base': f'/upload/audio/{MODEL_TO_IDX["base"]}/',
+    'bad': f'/upload/audio/{MODEL_TO_IDX["bad"]}/',
+    'pretest': '/upload/audio/pretest/',
 }
 
 def is_midi(fname):

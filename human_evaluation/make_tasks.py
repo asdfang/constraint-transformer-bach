@@ -1,16 +1,21 @@
 """
-create tasks.csv in the format of
+create *_pairs.csv in the format of
+pair_id,aug-gen_id,base_id,aug-gen_grade,base_grade,aug-gen_is,base_is
+where the first column is a unique pair_id (e.g. a_0), columns 2-3 have a chorale id, columns 4-5 have a grade, 
+and columns 6-7 have a and b, in a random order
 
+then create tasks.csv in the format of
 task_id,1,2,3,4,5,6,7,8,9,10
 
 where the first column is a unique task_id, and the rest of the columns are populated by pair_ids referring to
-pairs in answer_key.csv
+pairs in *_pair.csv
 """
 
 import sys
 sys.path.insert(0, '../')
 
 import csv
+import shutil, os
 import pandas as pd
 import numpy as np
 import numpy.random as random
@@ -22,12 +27,13 @@ from itertools import combinations
 from helpers import NUM_TASKS, CSV, is_midi, IDX_TO_COMPARISON
 
 BACH_DIR = 'chorales/cleaned_bach_chorales'
-BASE_DIR = 'models/base_05-06_19:15/unconstrained_mocks/'
-AUG_GEN_DIR = 'models/aug-gen_05-06_19:15/unconstrained_mocks/'
-BAD_DIR = 'models/aug-gen_05-06_19:15/unconstrained_mocks/'
+BASE_DIR = 'models/base_05-10_07:20/unconstrained_mocks_s1'
+AUG_GEN_DIR = 'models/aug-gen_05-09_06:09/unconstrained_mocks_s1'
+BAD_DIR = 'models/base_05-10_07:20/generations/1/'
 
 
 def main():
+    # duplicate_bad_generations('models/base_05-07_22:29/generations/1')
     directories = {'aug-gen': AUG_GEN_DIR, 'base': BASE_DIR, 'bach': BACH_DIR, 'bad': BAD_DIR}
     make_pairs(directories)
     make_tasks()
@@ -82,17 +88,29 @@ def make_pairs(dirs):
         random.shuffle(ids2)
         # read grades as dataframe
         grades_df1 = pd.read_csv(f'{dirs[label1]}/grades.csv')
-        grades_df2 = pd.read_csv(f'{dirs[label2]}/grades.csv')
+        if label2 != 'bad':
+            grades_df2 = pd.read_csv(f'{dirs[label2]}/grades.csv')
         # create pairs
         for pair_id, (id1, id2) in enumerate(zip(ids1, ids2)):
             random.shuffle(labels)
+            if label2 != 'bad':
+                grade2 = grades_df2.at[id2, 'grade']
+            else:
+                grade2 = -10000
             pair = pd.DataFrame(
-                [[pair_id, id1, id2, grades_df1.at[id1, 'grade'], grades_df2.at[id2, 'grade'], labels[0], labels[1]]], 
+                [[pair_id, id1, id2, grades_df1.at[id1, 'grade'], grade2, labels[0], labels[1]]], 
                 columns=columns
             )
             pairs_df = pairs_df.append(pair)
 
         pairs_df.to_csv(f'human_evaluation/data/{label1}_{label2}_pairs.csv', index=False)
+
+
+def duplicate_bad_generations(folder):
+    for i in range(7):
+        for j, chorale in enumerate(os.listdir(folder)):
+            shutil.copy(f'{folder}/{chorale}', f'{BAD_DIR}/{50*i + j}')
+    shutil.copy(f'{folder}/0.mid', f'{BAD_DIR}/351.mid')
 
 
 if __name__ == '__main__':

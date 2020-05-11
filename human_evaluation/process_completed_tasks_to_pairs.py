@@ -19,8 +19,8 @@ for x in ['a', 'b', 'c', 'd']:
 for i, task_row in completed_tasks_df.iterrows():
     task_id = int(task_row['task_id'])
     for question_id in range(1, 11):
-        pick = task_row[question_id]
-        pair_id = tasks_df.at[task_id, str(question_id)]
+        pick = task_row[f'q{question_id}']
+        pair_id = tasks_df.at[task_id, f'q{question_id}']
         comparison_idx = pair_id.split('_')[0]       # comparison type
         pair_row = pairs_df_dict[comparison_idx].iloc[int(pair_id.split('_')[1])]
         labels = IDX_TO_COMPARISON[comparison_idx]
