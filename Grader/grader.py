@@ -10,6 +10,7 @@ from sklearn.mixture import GaussianMixture
 import pickle
 import os
 from collections import Counter
+import numpy as np
 
 from Grader.distribution_helpers import *
 from Grader.compute_chorale_histograms import *
@@ -32,8 +33,63 @@ class Grader:
         self.error_note_ratio = None
         self.parallel_error_note_ratio = None
         self.gaussian = None
-        self.voice_ranges = self.compute_voice_ranges(self.iterator, 4)
+        self.voice_ranges = None
         self.load_or_pickle_distributions()
+    
+    def grade_chorale(self, chorale):
+        try:
+            chorale_vector = self.get_feature_vector(chorale)
+        except:     # sometimes the grading function fails
+            return float('-inf'), []
+        
+        gm = self.gaussian
+        grade = gm.score([chorale_vector])
+        return grade, chorale_vector
+    
+    def get_feature_vector(self, chorale):
+        assert self.distributions is not None
+        chorale_vector = []
+        for feature in self.features:
+            method_name = f'get_{feature}_grade'
+            feature_grade = getattr(self, method_name)(chorale)
+            chorale_vector.append(feature_grade)
+        
+        return chorale_vector
+
+    def load_or_pickle_distributions(self):
+        pickles_dir = f'{os.path.expanduser("~")}/transformer-bach/Grader/pickles/'
+        distributions_file = os.path.join(pickles_dir, 'bach_distributions.txt')
+        error_note_ratio_file =  os.path.join(pickles_dir, 'error_note_ratio.txt')
+        parallel_error_note_ratio_file =  os.path.join(pickles_dir, 'parallel_error_note_ratio.txt')
+        gaussian_file = os.path.join(pickles_dir, 'gaussian.txt')
+        voice_ranges_file = os.path.join(pickles_dir, 'voice_ranges.txt')
+        files = [distributions_file, error_note_ratio_file, parallel_error_note_ratio_file, gaussian_file, voice_ranges_file]
+
+        if np.all(os.path.exists(f) for f in files):
+            print('Loading Bach chorale distributions')
+            with open(distributions_file, 'rb') as fin:
+                self.distributions = pickle.load(fin)
+            with open(error_note_ratio_file, 'rb') as fin:
+                self.error_note_ratio = pickle.load(fin)
+            with open(parallel_error_note_ratio_file, 'rb') as fin:
+                self.parallel_error_note_ratio = pickle.load(fin)
+            with open(gaussian_file, 'rb') as fin:
+                self.gaussian = pickle.load(fin)
+            with open(voice_ranges_file, 'rb') as fin:
+                self.voice_ranges = pickle.load(fin)
+        else:
+            self.calculate_distributions()
+            self.compute_voice_ranges(self.iterator, 4)
+            with open(distributions_file, 'wb') as fo:
+                pickle.dump(self.distributions, fo)
+            with open(error_note_ratio_file, 'wb') as fo:
+                pickle.dump(self.error_note_ratio, fo)
+            with open(parallel_error_note_ratio_file, 'wb') as fo:
+                pickle.dump(self.parallel_error_note_ratio, fo)
+            with open(gaussian_file, 'wb') as fo:
+                pickle.dump(self.gaussian, fo)
+            with open(voice_ranges_file, 'wb') as fo:
+                pickle.dump(self.voice_ranges, fo)
     
     def compute_voice_ranges(self, iterator, num_voices):
         voice_ranges = []
@@ -48,37 +104,8 @@ class Grader:
                     voice_ranges[voice_index][0] = min(midi, voice_ranges[voice_index][0])
                     voice_ranges[voice_index][1] = max(midi, voice_ranges[voice_index][1])
 
-        return [tuple(e) for e in voice_ranges]
+        self.voice_ranges = [tuple(e) for e in voice_ranges]
 
-    def load_or_pickle_distributions(self):
-        pickles_dir = f'{os.path.expanduser("~")}/transformer-bach/Grader/pickles/'
-        distributions_file = os.path.join(pickles_dir, 'bach_distributions.txt')
-        error_note_ratio_file =  os.path.join(pickles_dir, 'error_note_ratio.txt')
-        parallel_error_note_ratio_file =  os.path.join(pickles_dir, 'parallel_error_note_ratio.txt')
-        gaussian_file = os.path.join(pickles_dir, 'gaussian.txt')
-
-        if os.path.exists(distributions_file) and os.path.exists(error_note_ratio_file) and os.path.exists(
-                parallel_error_note_ratio_file) and os.path.exists(gaussian_file):
-            print('Loading Bach chorale distributions')
-            with open(distributions_file, 'rb') as fin:
-                self.distributions = pickle.load(fin)
-            with open(error_note_ratio_file, 'rb') as fin:
-                self.error_note_ratio = pickle.load(fin)
-            with open(parallel_error_note_ratio_file, 'rb') as fin:
-                self.parallel_error_note_ratio = pickle.load(fin)
-            with open(gaussian_file, 'rb') as fin:
-                self.gaussian = pickle.load(fin)
-        else:
-            self.calculate_distributions()
-            with open(distributions_file, 'wb') as fo:
-                pickle.dump(self.distributions, fo)
-            with open(error_note_ratio_file, 'wb') as fo:
-                pickle.dump(self.error_note_ratio, fo)
-            with open(parallel_error_note_ratio_file, 'wb') as fo:
-                pickle.dump(self.parallel_error_note_ratio, fo)
-            with open(gaussian_file, 'wb') as fo:
-                pickle.dump(self.gaussian, fo)
-    
     def calculate_distributions(self):
         print('Calculating ground-truth distributions over Bach chorales')
 
@@ -208,27 +235,6 @@ class Grader:
 
         gm = GaussianMixture()
         self.gaussian = gm.fit(chorale_vectors)
-
-    def grade_chorale(self, chorale):
-        try:
-            chorale_vector = self.get_feature_vector(chorale)
-        except:     # sometimes the grading function fails
-            return float('-inf'), []
-        
-        gm = self.gaussian
-        grade = gm.score([chorale_vector])
-        return grade, chorale_vector
-    
-    
-    def get_feature_vector(self, chorale):
-        assert self.distributions is not None
-        chorale_vector = []
-        for feature in self.features:
-            method_name = f'get_{feature}_grade'
-            feature_grade = getattr(self, method_name)(chorale)
-            chorale_vector.append(feature_grade)
-        
-        return chorale_vector
     
     def get_error_grade(self, chorale):
         num_notes = len(chorale.flat.notes)
@@ -274,9 +280,10 @@ class Grader:
         """
         chorale_distribution = histogram_to_distribution(get_rhythm_histogram(chorale))
         dataset_distribution = self.distributions['rhythm_distribution']
-
         chorale_list, dataset_list = distribution_to_list(chorale_distribution, dataset_distribution)
-
+        # punish any chorale with note durations not used by Bach
+        if len(dataset_list) > len(dataset_distribution.keys()):
+            return 1e8
         return wasserstein_distance(chorale_list, dataset_list)
 
     def get_harmonic_quality_grade(self, chorale):
