@@ -112,6 +112,7 @@ def augmentative_generation(transformer,
         # only aug_gen creates new datasets
         if good_ct != 0:
             print('Creating dataset of Bach and good mock chorales')
+            shuffle(bach_and_good_mock)
             next_dataloader_generator = SmallBachDataloaderGenerator(
                 dataset_name=f'bach_and_good_mock_{epoch}',
                 chorales=bach_and_good_mock,

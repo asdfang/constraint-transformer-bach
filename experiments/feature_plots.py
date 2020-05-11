@@ -3,7 +3,7 @@ For visualizing feature distributions
 """
 
 import sys
-sys.path.insert(0, '../')
+sys.path[0] += '/../'
 
 import music21
 import matplotlib.pyplot as plt;
@@ -13,15 +13,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
-from grader.distribution_helpers import *
-from grader.compute_chorale_histograms import *
+from Grader.grader import Grader, FEATURES
+from Grader.distribution_helpers import *
+from Grader.compute_chorale_histograms import *
 from scipy.stats import wasserstein_distance
 
 MAJOR_NOTE_ORDER = ('5', '1', '3', '2', '6', '4', '7', '4♯', '7♭', 'Rest', '1♯', '5♯', '3♭', '2♯', '6♭', '2♭')
 MINOR_NOTE_ORDER = ('5', '1', '3', '4', '2', '7', '6', '7♯', '6♯', '3♯', 'Rest', '4♯', '2♭', '5♭', '1♯', '1♭')
 
 
-def get_chorale_note_distribution_and_score(chorale_filename, plot_filename,
+def get_chorale_note_distribution_and_grade(chorale_filename, plot_filename,
                                             major_note_distribution, minor_note_distribution,
                                             plot_title='Note distribution',):
     """
@@ -85,23 +86,24 @@ def plot_distribution(distribution, key_order=None, xlabel=None, title=None, out
 
 
 def main():
-    distributions_file = '../grader/bach_distributions.txt'
-    error_note_ratio_file = '../grader/error_note_ratio.txt'
-    parallel_error_note_ratio_file = '../grader/parallel_error_note_ratio.txt'
+    grader = Grader(
+        features=FEATURES,
+        iterator=None,
+    )
 
-    with open(distributions_file, 'rb') as fin:
-        distributions = pickle.load(fin)
+    # get_chorale_note_distribution_and_grade(
+    #     chorale_filename='models/base_05-07_22:29/generations/10/3.mid', 
+    #     plot_filename='plots/note_dist.png',
+    #     major_note_distribution=grader.distributions['major_note_distribution'],
+    #     minor_note_distribution=grader.distributions['minor_note_distribution'],
+    #     plot_title='Note Distribution for Chorale 1'
+    # )
 
-    get_chorale_note_distribution_and_score(chorale_filename='../generations/paired_evaluation/9/9_41.mid', 
-                                            plot_filename='../plots/9_41_note.png',
-                                            major_note_distribution=distributions['major_note_distribution'],
-                                            minor_note_distribution=distributions['minor_note_distribution'])
-
-    # plt_folder = '../plots/bach_dist/'
-    # plot_distribution(distributions['major_note_distribution'],
-    #                   title='Major Note Distribution',
-    #                   key_order=major_note_order,
-    #                   outfile=plt_folder + 'major_note_distribution.png')
+    plot_distribution(grader.distributions['major_note_distribution'],
+                      title='Major Note Distribution for Bach Chorales',
+                      key_order=MAJOR_NOTE_ORDER,
+                      xlabel='Scale Degree',
+                      outfile='plots/bach_major_note_dist')
     # plot_distribution(distributions['minor_note_distribution'],
     #                   title='Minor Note Distribution',
     #                   key_order=minor_note_order,

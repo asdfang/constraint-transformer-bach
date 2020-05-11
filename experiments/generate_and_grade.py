@@ -79,11 +79,13 @@ def grade_unconstrained_mock(grader,
         mock_grades.append([grade, *chorale_vector])
     
     print('Writing data to csv file')
-    with open(f'{output_dir}/grades.csv', 'w') as chorale_file:
-        reader = csv.writer(chorale_file)
-        reader.writerow(['', 'grade'] + FEATURES)
-        for i, grades in enumerate(mock_grades):
-            reader.writerow([i, *grades])
+    grades_file = open(f'{output_dir}/grades.csv', 'w')
+    reader = csv.writer(grades_file)
+    reader.writerow(['', 'grade'] + FEATURES)
+    for i, grades in enumerate(mock_grades):
+        reader.writerow([i, *grades])
+        grades_file.flush()
+    grades_file.close()
 
 
 def grade_constrained_mock(grader,
