@@ -12,17 +12,25 @@ import os
 from collections import Counter
 import numpy as np
 
-from Grader.distribution_helpers import *
-from Grader.compute_chorale_histograms import *
+from transformer_bach.utils import ensure_dir
+from Grader.distribution_helpers import histogram_to_distribution, distribution_to_list
+from Grader.compute_chorale_histograms import get_note_histogram, get_harmonic_quality_histogram, get_SATB_interval_histogram, get_interval_histogram, \
+    get_harmonic_quality_histogram, get_rhythm_histogram, get_error_histogram, get_parallel_error_histogram, get_repeated_sequence_histogram, \
+    get_repeated_sequence_histogram_1, get_repeated_sequence_histogram_2, get_self_similarity_histogram
+from Grader.find_self_similarity import BINS
 
 
-FEATURES = ['error', 'parallel_error', 'note', 'rhythm', 'harmonic_quality', 
-            'directed_interval', 'S_directed_interval', 'A_directed_interval', 
-            'T_directed_interval', 'B_directed_interval']
-            
+FEATURES = ['note', 'rhythm', 'parallel_error', 'error', 'harmonic_quality',
+            'directed_interval', 'S_directed_interval', 'A_directed_interval', 'T_directed_interval', 'B_directed_interval']
+
+POSSIBLE_FEATURES = ['note', 'rhythm', 'parallel_error', 'error', 'harmonic_quality',
+                     'directed_interval', 'S_directed_interval', 'A_directed_interval', 'T_directed_interval', 'B_directed_interval',
+                     'undirected_interval', 'S_undirected_interval', 'A_undirected_interval', 'T_undirected_interval', 'B_undirected_interval'
+                     'repeated_sequence_1', 'repeated_sequence_2', 'S_repeated_sequence', 'A_repeated_sequence', 'T_repeated_sequence', 
+                     'B_repeated_sequence', 'self_similarity']
 
 class Grader:         
-    def __init__(self, features, iterator):
+    def __init__(self, features, iterator, pickle_dir=None):
         """
         :param features: a list of features to use in grading
         :param iterator: an iterator of chorales to grade against
@@ -32,8 +40,12 @@ class Grader:
         self.distributions = None
         self.error_note_ratio = None
         self.parallel_error_note_ratio = None
+        self.chorale_vectors = None
         self.gaussian = None
         self.voice_ranges = None
+        if pickle_dir is None:
+            pickle_dir = '.'
+        self.pickle_dir = f'{os.path.expanduser("~")}/transformer-bach/Grader/pickles/{pickle_dir}'
         self.load_or_pickle_distributions()
     
     def grade_chorale(self, chorale):
@@ -55,18 +67,16 @@ class Grader:
             chorale_vector.append(feature_grade)
         
         return chorale_vector
-
+    
     def load_or_pickle_distributions(self):
-        pickles_dir = f'{os.path.expanduser("~")}/transformer-bach/Grader/pickles/'
-        distributions_file = os.path.join(pickles_dir, 'bach_distributions.txt')
-        error_note_ratio_file =  os.path.join(pickles_dir, 'error_note_ratio.txt')
-        parallel_error_note_ratio_file =  os.path.join(pickles_dir, 'parallel_error_note_ratio.txt')
-        gaussian_file = os.path.join(pickles_dir, 'gaussian.txt')
-        voice_ranges_file = os.path.join(pickles_dir, 'voice_ranges.txt')
-        files = [distributions_file, error_note_ratio_file, parallel_error_note_ratio_file, gaussian_file, voice_ranges_file]
-
-        if np.all(os.path.exists(f) for f in files):
-            print('Loading Bach chorale distributions')
+        distributions_file = os.path.join(self.pickle_dir, 'bach_distributions.txt')
+        error_note_ratio_file =  os.path.join(self.pickle_dir, 'error_note_ratio.txt')
+        parallel_error_note_ratio_file =  os.path.join(self.pickle_dir, 'parallel_error_note_ratio.txt')
+        gaussian_file = os.path.join(self.pickle_dir, 'gaussian.txt')
+        voice_ranges_file = os.path.join(self.pickle_dir, 'voice_ranges.txt')
+        
+        if os.path.exists(self.pickle_dir):
+            print(f'Loading Bach chorale distributions from {self.pickle_dir}')
             with open(distributions_file, 'rb') as fin:
                 self.distributions = pickle.load(fin)
             with open(error_note_ratio_file, 'rb') as fin:
@@ -78,8 +88,12 @@ class Grader:
             with open(voice_ranges_file, 'rb') as fin:
                 self.voice_ranges = pickle.load(fin)
         else:
-            self.calculate_distributions()
             self.compute_voice_ranges(self.iterator, 4)
+            self.calculate_distributions()
+            ensure_dir(self.pickle_dir)
+            with open(f'{self.pickle_dir}/features.txt', 'w') as readme:
+                readme.write('Features:\n')
+                readme.write('\n'.join(self.features))
             with open(distributions_file, 'wb') as fo:
                 pickle.dump(self.distributions, fo)
             with open(error_note_ratio_file, 'wb') as fo:
@@ -109,81 +123,141 @@ class Grader:
     def calculate_distributions(self):
         print('Calculating ground-truth distributions over Bach chorales')
 
-        major_nh = Counter()            # notes (for chorales in major)
-        minor_nh = Counter()            # notes (for chorales in minor)
+        # initialize all histograms
+        major_nh, minor_nh = Counter(), Counter()            # notes (for chorales in major)
+                                                             # notes (for chorales in minor)
         rh = Counter()                  # rhythm
-        major_hqh = Counter()           # harmonic quality
-        minor_hqh = Counter()
-        major_directed_ih = Counter()         # directed intervals for whole chorale
-        minor_directed_ih = Counter()
-        major_S_directed_ih = Counter()       # ... for soprano
-        minor_S_directed_ih = Counter()
-        major_A_directed_ih = Counter()       # ... for alto
-        minor_A_directed_ih = Counter()
-        major_T_directed_ih = Counter()       # ... for tenor
-        minor_T_directed_ih = Counter()
-        major_B_directed_ih = Counter()       # ... for bass
-        minor_B_directed_ih = Counter()
-        major_undirected_ih = Counter()       # undirected intervals for whole chorale
-        minor_undirected_ih = Counter()
-        major_S_undirected_ih = Counter()     # ... for soprano
-        minor_S_undirected_ih = Counter()
-        major_A_undirected_ih = Counter()     # ... for alto
-        minor_A_undirected_ih = Counter()
-        major_T_undirected_ih = Counter()     # ... for tenor
-        minor_T_undirected_ih = Counter()
-        major_B_undirected_ih = Counter()     # ... for bass
-        minor_B_undirected_ih = Counter()
-        eh = Counter()                  # errors (not including parallelism)
-        peh = Counter()                 # parallel errors (octaves and fifths)
+        
+        major_hqh, minor_hqh = Counter(), Counter()           # harmonic quality
+        
+        major_directed_ih, minor_directed_ih = Counter(), Counter()         # directed intervals for whole chorale
+        major_S_directed_ih, minor_S_directed_ih = Counter(), Counter()     # ... for soprano
+        major_A_directed_ih, minor_A_directed_ih = Counter(), Counter()     # ... for alto
+        major_T_directed_ih, minor_T_directed_ih = Counter(), Counter()     # ... for tenor
+        major_B_directed_ih, minor_B_directed_ih = Counter(), Counter()     # ... for bass
+        
+        major_undirected_ih, minor_undirected_ih = Counter(), Counter()       # undirected intervals for whole chorale
+        major_S_undirected_ih, minor_S_undirected_ih = Counter(), Counter()   # ... for soprano
+        major_A_undirected_ih, minor_A_undirected_ih = Counter(), Counter()   # ... for alto
+        major_T_undirected_ih, minor_T_undirected_ih = Counter(), Counter()   # ... for tenor
+        major_B_undirected_ih, minor_B_undirected_ih = Counter(), Counter()   # ... for bass
+        eh, peh = Counter(), Counter()                  # errors (not including parallelism)
+                                                        # parallel errors (octaves and fifths)
+        sh_1, sh_2, S_sh, A_sh, T_sh, B_sh = Counter(), Counter(), Counter(), Counter(), Counter(), Counter()     # repeated sequences
+        ssh = Counter()           # self-similarity
+        ssh.update({b: 0 for b in BINS[:-1]})
         num_notes = 0                   # number of notes
 
-        print('Calculating feature distributions for Bach chorales')
+        # calculate histograms for all Bach chorales (for relevant features)
         for chorale in tqdm(self.iterator):
             key = chorale.analyze('key')
-            chorale_nh = get_note_histogram(chorale, key)
-            if key.mode == 'major':
-                # note histogram
-                major_nh += chorale_nh
-                # harmonic quality histogram
-                major_hqh += get_harmonic_quality_histogram(chorale)
-                # interval histograms
-                major_directed_ih += get_interval_histogram(chorale, directed=True)
-                major_S_directed_ih += get_SATB_interval_histogram(chorale, voice=0, directed=True)
-                major_A_directed_ih += get_SATB_interval_histogram(chorale, voice=1, directed=True)
-                major_T_directed_ih += get_SATB_interval_histogram(chorale, voice=2, directed=True)
-                major_B_directed_ih += get_SATB_interval_histogram(chorale, voice=3, directed=True)
-                major_undirected_ih += get_interval_histogram(chorale, directed=False)
-                major_S_undirected_ih += get_SATB_interval_histogram(chorale, voice=0, directed=False)
-                major_A_undirected_ih += get_SATB_interval_histogram(chorale, voice=1, directed=False)
-                major_T_undirected_ih += get_SATB_interval_histogram(chorale, voice=2, directed=False)
-                major_B_undirected_ih += get_SATB_interval_histogram(chorale, voice=3, directed=False)
-            else:
-                # note histogram
-                minor_nh += chorale_nh
-                # harmonic quality histogram
-                minor_hqh += get_harmonic_quality_histogram(chorale)
-                # interval histograms
-                minor_directed_ih += get_interval_histogram(chorale, directed=True)
-                minor_S_directed_ih += get_SATB_interval_histogram(chorale, voice=0, directed=True)
-                minor_A_directed_ih += get_SATB_interval_histogram(chorale, voice=1, directed=True)
-                minor_T_directed_ih += get_SATB_interval_histogram(chorale, voice=2, directed=True)
-                minor_B_directed_ih += get_SATB_interval_histogram(chorale, voice=3, directed=True)
-                minor_undirected_ih += get_interval_histogram(chorale, directed=False)
-                minor_S_undirected_ih += get_SATB_interval_histogram(chorale, voice=0, directed=False)
-                minor_A_undirected_ih += get_SATB_interval_histogram(chorale, voice=1, directed=False)
-                minor_T_undirected_ih += get_SATB_interval_histogram(chorale, voice=2, directed=False)
-                minor_B_undirected_ih += get_SATB_interval_histogram(chorale, voice=3, directed=False)
+            if 'note' in self.features:
+                chorale_nh = get_note_histogram(chorale, key)
+                if key.mode == 'major':
+                    major_nh += chorale_nh
+                else:
+                    minor_nh += chorale_nh
 
-            # rhythm histogram
-            rh += get_rhythm_histogram(chorale)
+            if 'harmonic_quality' in self.features:
+                if key.mode == 'major':
+                    major_hqh += get_harmonic_quality_histogram(chorale)
+                else:
+                    minor_hqh += get_harmonic_quality_histogram(chorale)
             
-            # error histogram
-            eh += get_error_histogram(chorale, self.voice_ranges)
-            # parallel error histogram
-            peh += get_parallel_error_histogram(chorale)
+            if 'directed_interval' in self.features:
+                if key.mode == 'major':
+                    major_directed_ih += get_interval_histogram(chorale, directed=True)
+                else:
+                    minor_directed_ih += get_interval_histogram(chorale, directed=True)
+            
+            if 'undirected_interval' in self.features:
+                if key.mode == 'major':
+                    major_undirected_ih += get_interval_histogram(chorale, directed=False)
+                else:
+                    minor_undirected_ih += get_interval_histogram(chorale, directed=False)
+            
+            if 'S_directed_ih' in self.features:
+                if key.mode == 'major':
+                    major_S_directed_ih += get_SATB_interval_histogram(chorale, voice=0, directed=True)
+                else:
+                    minor_S_directed_ih += get_SATB_interval_histogram(chorale, voice=0, directed=True)
+            
+            if 'A_directed_ih' in self.features:
+                if key.mode == 'major':
+                    major_A_directed_ih += get_SATB_interval_histogram(chorale, voice=1, directed=True)
+                else:
+                    minor_A_directed_ih += get_SATB_interval_histogram(chorale, voice=1, directed=True)
+            
+            if 'T_directed_ih' in self.features:
+                if key.mode == 'major':
+                    major_T_directed_ih += get_SATB_interval_histogram(chorale, voice=2, directed=True)
+                else:
+                    minor_T_directed_ih += get_SATB_interval_histogram(chorale, voice=2, directed=True)
+            
+            if 'B_directed_ih' in self.features:
+                if key.mode == 'major':
+                    major_B_directed_ih += get_SATB_interval_histogram(chorale, voice=3, directed=True)
+                else:
+                    minor_B_directed_ih += get_SATB_interval_histogram(chorale, voice=3, directed=True)
+            
+            if 'S_undirected_ih' in self.features:
+                if key.mode == 'major':
+                    major_S_undirected_ih += get_SATB_interval_histogram(chorale, voice=0, directed=False)
+                else:
+                    minor_S_undirected_ih += get_SATB_interval_histogram(chorale, voice=0, directed=False)
+            
+            if 'A_undirected_ih' in self.features:
+                if key.mode == 'major':
+                    major_A_undirected_ih += get_SATB_interval_histogram(chorale, voice=1, directed=False)
+                else:
+                    minor_A_undirected_ih += get_SATB_interval_histogram(chorale, voice=1, directed=False)
+            
+            if 'T_undirected_ih' in self.features:
+                if key.mode == 'major':
+                    major_T_undirected_ih += get_SATB_interval_histogram(chorale, voice=2, directed=False)
+                else:
+                    minor_T_undirected_ih += get_SATB_interval_histogram(chorale, voice=2, directed=False)
+            
+            if 'B_undirected_ih' in self.features:
+                if key.mode == 'major':
+                    major_B_undirected_ih += get_SATB_interval_histogram(chorale, voice=3, directed=False)
+                else:
+                    minor_B_undirected_ih += get_SATB_interval_histogram(chorale, voice=3, directed=False)
+
+            if 'rhythm' in self.features:
+                rh += get_rhythm_histogram(chorale)
+            
+            if 'error' in self.features:
+                eh += get_error_histogram(chorale, self.voice_ranges)
+            
+            if 'parallel_error' in self.features:
+                peh += get_parallel_error_histogram(chorale)
+            
+            if 'repeated_sequence_1' in self.features:
+                sh_1 += get_repeated_sequence_histogram_1(chorale)
+
+            if 'repeated_sequence_2' in self.features:
+                sh_2 += get_repeated_sequence_histogram_2(chorale)
+            
+            if 'S_repeated_sequence' in self.features:
+                sh += get_repeated_sequence_histogram(chorale, voice=0)
+            
+            if 'A_repeated_sequence' in self.features:
+                sh += get_repeated_sequence_histogram(chorale, voice=1)
+            
+            if 'T_repeated_sequence' in self.features:
+                sh += get_repeated_sequence_histogram(chorale, voice=2)
+            
+            if 'B_repeated_sequence' in self.features:
+                sh += get_repeated_sequence_histogram(chorale, voice=3)
+
+            if 'self_similarity' in self.features:
+                ssh.update(get_self_similarity_histogram(chorale))
+            
             # number of notes
             num_notes += len(chorale.flat.notes)
+
+        print(f'len(ssh.keys()): {len(ssh.keys())}')
 
         # proportion of errors to notes
         error_note_ratio = sum(eh.values()) / num_notes
@@ -191,7 +265,6 @@ class Grader:
         # proportion of parallel errors to notes
         parallel_error_note_ratio = sum(peh.values()) / num_notes
 
-        # convert histograms to distributions by normalizing
         distributions = {'major_note_distribution': major_nh,
                          'minor_note_distribution': minor_nh,
                          'rhythm_distribution': rh,
@@ -218,8 +291,16 @@ class Grader:
                          'major_B_undirected_interval_distribution': major_B_undirected_ih,
                          'minor_B_undirected_interval_distribution': minor_B_undirected_ih,
                          'error_distribution': eh,
-                         'parallel_error_distribution': peh}
+                         'parallel_error_distribution': peh,
+                         'repeated_sequence_1_distribution': sh_1,
+                         'repeated_sequence_2_distribution': sh_2,
+                         'S_repeated_sequence_distribution': S_sh,
+                         'A_repeated_sequence_distribution': A_sh,
+                         'T_repeated_sequence_distribution': T_sh,
+                         'B_repeated_sequence_distribution': B_sh,
+                         'self_similarity_distribution': ssh}
 
+        # normalize each histogram by the sum of dictionary values, converting to distribution
         for dist in distributions:
             distributions[dist] = histogram_to_distribution(distributions[dist])
 
@@ -227,13 +308,14 @@ class Grader:
         self.parallel_error_note_ratio = parallel_error_note_ratio
         self.distributions = distributions
 
-        chorale_vectors = []
         print('Calculating Gaussian')
+        chorale_vectors = []
         for chorale in tqdm(self.iterator):
             chorale_vector = self.get_feature_vector(chorale)
             chorale_vectors.append(chorale_vector)
-
+        
         gm = GaussianMixture()
+        self.chorale_vectors = chorale_vectors
         self.gaussian = gm.fit(chorale_vectors)
     
     def get_error_grade(self, chorale):
@@ -282,8 +364,8 @@ class Grader:
         dataset_distribution = self.distributions['rhythm_distribution']
         chorale_list, dataset_list = distribution_to_list(chorale_distribution, dataset_distribution)
         # punish any chorale with note durations not used by Bach
-        if len(dataset_list) > len(dataset_distribution.keys()):
-            return 1e8
+        # if len(dataset_list) > len(dataset_distribution.keys()):
+        #     return 1e8
         return wasserstein_distance(chorale_list, dataset_list)
 
     def get_harmonic_quality_grade(self, chorale):
@@ -380,3 +462,112 @@ class Grader:
         dataset_distribution = self.distributions[f'{key.mode}_B_undirected_interval_distribution']
 
         return wasserstein_distance(*distribution_to_list(chorale_distribution, dataset_distribution))
+    
+    def get_repeated_sequence_1_grade(self, chorale):
+        sh = get_repeated_sequence_histogram_1(chorale)
+        chorale_distribution = histogram_to_distribution(sh)
+        dataset_distribution = self.distributions['repeated_sequence_1_distribution']
+        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # longest sequence, in ticks
+        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
+
+        # populate chorale_list at the indices corresponding to keys in chorale_distribution
+        for seq_len in chorale_distribution:
+            chorale_list[seq_len] = chorale_distribution[seq_len]
+        
+        for seq_len in dataset_distribution:
+            dataset_list[seq_len] = dataset_distribution[seq_len]
+
+        return wasserstein_distance(chorale_list, dataset_list)
+    
+    def get_repeated_sequence_2_grade(self, chorale):
+        sh = get_repeated_sequence_histogram_2(chorale)
+        chorale_distribution = histogram_to_distribution(sh)
+        dataset_distribution = self.distributions['repeated_sequence_2_distribution']
+        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
+        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
+
+        # populate chorale_list at the indices corresponding to keys in chorale_distribution
+        for seq_len in chorale_distribution:
+            chorale_list[seq_len] = chorale_distribution[seq_len]
+        
+        for seq_len in dataset_distribution:
+            dataset_list[seq_len] = dataset_distribution[seq_len]
+
+        return wasserstein_distance(chorale_list, dataset_list)
+
+    def get_S_repeated_sequence_grade(self, chorale):
+        sh = get_repeated_sequence_histogram(chorale, voice=0)
+        chorale_distribution = histogram_to_distribution(sh)
+        dataset_distribution = self.distributions['S_repeated_sequence_distribution']
+        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
+        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
+
+        # populate chorale_list at the indices corresponding to keys in chorale_distribution
+        for seq_len in chorale_distribution:
+            chorale_list[seq_len] = chorale_distribution[seq_len]
+        
+        for seq_len in dataset_distribution:
+            dataset_list[seq_len] = dataset_distribution[seq_len]
+
+        return wasserstein_distance(chorale_list, dataset_list)
+    
+    def get_A_repeated_sequence_grade(self, chorale):
+        sh = get_repeated_sequence_histogram(chorale, voice=1)
+        chorale_distribution = histogram_to_distribution(sh)
+        dataset_distribution = self.distributions['A_repeated_sequence_distribution']
+        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
+        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
+
+        # populate chorale_list at the indices corresponding to keys in chorale_distribution
+        for seq_len in chorale_distribution:
+            chorale_list[seq_len] = chorale_distribution[seq_len]
+        
+        for seq_len in dataset_distribution:
+            dataset_list[seq_len] = dataset_distribution[seq_len]
+
+        return wasserstein_distance(chorale_list, dataset_list)
+    
+    def get_T_repeated_sequence_grade(self, chorale):
+        sh = get_repeated_sequence_histogram(chorale, voice=2)
+        chorale_distribution = histogram_to_distribution(sh)
+        dataset_distribution = self.distributions['T_repeated_sequence_distribution']
+        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
+        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
+
+        # populate chorale_list at the indices corresponding to keys in chorale_distribution
+        for seq_len in chorale_distribution:
+            chorale_list[seq_len] = chorale_distribution[seq_len]
+        
+        for seq_len in dataset_distribution:
+            dataset_list[seq_len] = dataset_distribution[seq_len]
+
+        return wasserstein_distance(chorale_list, dataset_list)
+    
+    def get_B_repeated_sequence_grade(self, chorale):
+        sh = get_repeated_sequence_histogram(chorale, voice=3)
+        chorale_distribution = histogram_to_distribution(sh)
+        dataset_distribution = self.distributions['B_repeated_sequence_distribution']
+        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
+        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
+
+        # populate chorale_list at the indices corresponding to keys in chorale_distribution
+        for seq_len in chorale_distribution:
+            chorale_list[seq_len] = chorale_distribution[seq_len]
+        
+        for seq_len in dataset_distribution:
+            dataset_list[seq_len] = dataset_distribution[seq_len]
+
+        return wasserstein_distance(chorale_list, dataset_list)
+
+    def get_self_similarity_grade(self, chorale):
+        ssh = get_self_similarity_histogram(chorale)
+        chorale_distribution = histogram_to_distribution(ssh)
+        dataset_distribution = self.distributions['self_similarity_distribution']
+        assert len(chorale_distribution.keys()) == len(dataset_distribution.keys())
+        chorale_list, dataset_list = [0] * len(chorale_distribution), [0] * len(chorale_distribution)
+        
+        for i, b in enumerate(BINS[:-1]):
+            chorale_list[i] = chorale_distribution[b]
+            dataset_list[i] = dataset_distribution[b]
+
+        return wasserstein_distance(chorale_list, dataset_list)

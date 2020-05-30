@@ -52,3 +52,16 @@ def distribution_to_list(chorale_distribution, dataset_distribution):
     assert len(ordered_dataset_distribution_vals) == len(ordered_chorale_distribution_vals)
 
     return ordered_chorale_distribution_vals, ordered_dataset_distribution_vals
+
+
+def ordered_distributions_to_wasserstein_inputs(chorale_ordered_dist, dataset_ordered_dist):
+    """
+    Arguments:
+        chorale_ordered_dist and dataset_ordered_dist: outputs from distribution_to_list()
+
+    returns a 4-tuple that preserves the order for scipy's Wasserstein. chorale_vals == distribution_vals.
+    """
+    assert len(chorale_ordered_dist) == len(dataset_ordered_dist)
+    chorale_vals, distribution_vals = [i for i in range(len(chorale_ordered_dist))], [j for j in range(len(dataset_ordered_dist))]
+
+    return chorale_vals, distribution_vals, chorale_ordered_dist, dataset_ordered_dist
