@@ -1,7 +1,11 @@
 import csv
 from tqdm import tqdm
+import os
+import numpy as np
+import music21
 
 from transformer_bach.decoder_relative import TransformerBach
+from transformer_bach.utils import parse_xml
 from Grader.grader import Grader, FEATURES
 from transformer_bach.constraint_helpers import score_to_hold_representation_for_voice
 from transformer_bach.utils import ensure_dir
@@ -9,30 +13,33 @@ from transformer_bach.utils import ensure_dir
 max_batch_size = 25
 
 
-def grade_bach(grader, 
-               bach_iterator, 
-               grades_csv='tmp.csv'):
+def grade_folder(chorale_dir, grader, grades_csv=None):
     """
-    grade Bach chorales
+    Arguments:
+        chorale_dir: directory of chorales named 0.xml, 1.xml, etc.
+        grader: Grader object
+        grades_csv: file to write grades to
     
-    Usage example:
-        grade_bach(grader=grader, 
-                   bach_iterator=bach_dataloader_generator.dataset.iterator_gen(), 
-                   grades_csv='results/bach_grades.csv')
+    grade a folder of chorales 
     """
-    print('Grading Bach chorales')
-    bach_grades = []
-
-    for bach_score in tqdm(bach_iterator):
-        grade, chorale_vector = grader.grade_chorale(bach_score)
-        bach_grades.append([grade, *chorale_vector])
-
-    print('Writing data to csv files')
-    with open(f'chorales/cleaned_bach_chorales/{grades_csv}', 'w') as chorale_file:
-        reader = csv.writer(chorale_file)
-        reader.writerow(['', 'grade'] + FEATURES)
-        for i, grades in enumerate(bach_grades):
-            reader.writerow([i, *grades])
+    print(f'Grading chorales in {chorale_dir}')
+    grades = []
+    num_chorales = int(np.sum([1 for fname in os.listdir(chorale_dir) if fname.endswith('.xml')]))
+    
+    for chorale_idx in tqdm(range(num_chorales)):
+        chorale_xml = f'{chorale_dir}/{chorale_idx}.xml'
+        score = parse_xml(chorale_xml)
+        grade, chorale_vector = grader.grade_chorale(score)
+        grades.append([grade, *chorale_vector])
+    
+    if grades_csv is None:
+        grades_csv = f'{chorale_dir}/grades.csv'
+    print(f'Writing data to {chorale_dir}/{grades_csv}')
+    with open(f'{chorale_dir}/{grades_csv}', 'w') as chorale_file:
+        writer = csv.writer(chorale_file)
+        writer.writerow(['', 'grade'] + grader.features)
+        for i, grades in enumerate(grades):
+            writer.writerow([i, *grades])
 
 
 def grade_unconstrained_mock(grader, 
@@ -68,11 +75,11 @@ def grade_unconstrained_mock(grader,
         mock_scores.extend(score_batch)
     
     for i, score in enumerate(mock_scores):
-        # write score to MIDI
+        # write score to XML
         if output_dir is None:
             output_dir = f'{transformer.model_dir}/unconstrained_mocks/'
         ensure_dir(output_dir)
-        score.write('midi', f'{output_dir}/{i}.mid')
+        score.write('xml', f'{output_dir}/{i}.xml')
         
         # grade chorale
         grade, chorale_vector = grader.grade_chorale(score)
@@ -124,11 +131,11 @@ def grade_constrained_mock(grader,
             mock_grades.append([float('-inf')])
             continue
         
-        # write mock_score to MIDI
+        # write mock_score to XML
         if output_dir is None:
             output_dir = f'{transformer.model_dir}/constrained_mocks/'
         ensure_dir(output_dir)
-        mock_score.write('midi', f'{output_dir}/{i}.mid')
+        mock_score.write('xml', f'{output_dir}/{i}.xml')
         
         # grade chorale
         grade, chorale_vector = grader.grade_chorale(mock_score)

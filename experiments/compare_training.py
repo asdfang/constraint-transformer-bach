@@ -4,8 +4,9 @@ sys.path[0] += '/../'
 from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
-from experiments.helpers import read_training_data
 from Grader.helpers import get_threshold
+from experiments.helpers import read_training_data
+
 
 PLOT_COLORS = {'bach': 'lightcoral', 'aug-gen': 'lightskyblue', 'base': 'darkgray'}
 PLOT_LABELS = {'bach': 'Bach', 'aug-gen': 'Aug. Gen.', 'base': 'Base'}

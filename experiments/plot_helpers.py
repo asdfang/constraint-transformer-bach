@@ -37,7 +37,7 @@ def get_chorale_note_distribution_and_score(chorale_filename, plot_filename, plo
 
     Saves a plot, and returns a score
     """
-    chorale = music21.converter.parse(chorale_filename)
+    chorale = parse_xml(chorale_filename)
     key = chorale.analyze('key')
     chorale_distribution = histogram_to_distribution(get_note_histogram(chorale, key))
     note_distribution = major_note_distribution if key.mode == 'major' else minor_note_distribution

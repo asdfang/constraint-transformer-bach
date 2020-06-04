@@ -21,8 +21,7 @@ def main(model_dir):
     data_file = f'{model_dir}/grades.csv'
     plt_dir = f'{model_dir}/plots/'
 
-    plot_boxplot_per_epoch(data_file=data_file, plt_dir=plt_dir, threshold=-1000)
-    # plot_histogram_per_iteration(data_file=data_file, plt_dir=plt_dir)
+    plot_boxplot_per_epoch(data_file=data_file, plt_dir=plt_dir)
     plot_selections_per_epoch(data_file=data_file, plt_dir=plt_dir)
     plot_unique_per_epoch(data_file=f'{model_dir}/dataset_sizes.csv', plt_dir=plt_dir)
     plot_dataset_sizes_per_epoch(data_file=f'{model_dir}/dataset_sizes.csv', plt_dir=plt_dir)
@@ -64,27 +63,33 @@ def plot_boxplot_per_epoch(data_file='results/update_grades_over_bach_chorales.c
     visualize model updates by plotting boxplot for grade distribution at each epoch
     """
     # read update data as dictionary
-    data_dict = read_training_data(data_file=data_file, feature=feature, threshold=-1000)
-    print([len(v) for v in data_dict.values()])
+    data_dict = read_training_data(data_file=data_file, feature=feature)
     
     # plot
     plt.figure()
     plt.style.use('seaborn-whitegrid')
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8,6))
     ax.xaxis.grid(False)
     ax.boxplot(list(data_dict.values()))
+    ax.set_xticks([i+1 for i in data_dict.keys()])
     ax.set_xticklabels([str(i) for i in data_dict.keys()])
-    for label in ax.get_xaxis().get_ticklabels()[::2]:
+    for label in ax.get_xaxis().get_ticklabels()[1::2]:
         label.set_visible(False)
     plt.xlabel('Epoch')
     plt.title(f'{feature.capitalize()} Distribution of Generations During Training')
     plt.ylabel(feature.capitalize())
-    plt.ylim([threshold, 50])
+    plt.ylim([None, 50])
     
-    thres = get_threshold(feature=feature)
-    plt.axhline(y=thres, color='steelblue', linestyle='-')
+    threshold = get_threshold(
+        data_file='experiments/ablations/reg_pe_no_oe/sum_bach_grades.csv',
+        column='grade',
+        aggregate='median',
+    )
+    plt.axhline(y=threshold, color='steelblue', linestyle='-.', label='Median Bach chorale grade')
+    plt.legend(loc='lower right')
 
     ensure_dir(plt_dir)
+    fig.tight_layout()
     plt.savefig(os.path.join(plt_dir, f'{feature}_update_boxplots.png'))
 
 
@@ -118,9 +123,13 @@ def plot_selections_per_epoch(data_file='results/update_grades_over_bach_chorale
     """
     plot number of selections each epoch
     """
-    thres = get_threshold(feature='grade')
+    thres = get_threshold(
+        data_file='experiments/ablations/reg_pe_no_oe/sum_bach_grades.csv',
+        column='grade',
+        aggregate='75p',
+    )
     data_dict = read_training_data(data_file=data_file, feature='grade')
-    picked = [np.sum([1 for x in data if x > thres]) for data in data_dict.values()]
+    picked = [np.sum([1 for x in data if x < thres]) for data in data_dict.values()]
     
     plt.figure()
     fig, ax = plt.subplots()
