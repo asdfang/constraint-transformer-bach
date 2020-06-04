@@ -101,6 +101,13 @@ ENV/
 .idea/
 models/**
 data/**
+Grader/pickles/**
+human_evaluation/351_completions/
+human_evaluation/completions/
+human_evaluation/data/
+human_evaluation/new_grades_data/
+human_evaluation/waveform_completions/
+test_scripts/
 
 *.tar.gz
 !download_pretrained_data.sh
