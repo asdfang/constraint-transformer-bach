@@ -17,6 +17,7 @@ from Grader.grader import Grader, FEATURES
 from Grader.distribution_helpers import *
 from Grader.compute_chorale_histograms import *
 from scipy.stats import wasserstein_distance
+from transformer_bach.utils import parse_xml
 
 MAJOR_NOTE_ORDER = ('5', '1', '3', '2', '6', '4', '7', '4♯', '7♭', 'Rest', '1♯', '5♯', '3♭', '2♯', '6♭', '2♭')
 MINOR_NOTE_ORDER = ('5', '1', '3', '4', '2', '7', '6', '7♯', '6♯', '3♯', 'Rest', '4♯', '2♭', '5♭', '1♯', '1♭')
@@ -36,7 +37,7 @@ def get_chorale_note_distribution_and_grade(chorale_filename, plot_filename,
 
     Saves a plot, and returns a score
     """
-    chorale = music21.converter.parse(chorale_filename)
+    chorale = parse_xml(chorale_filename)
     key = chorale.analyze('key')
     print(key)
     chorale_distribution = histogram_to_distribution(get_note_histogram(chorale, key))
