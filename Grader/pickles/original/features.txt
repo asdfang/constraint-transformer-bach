@@ -1,0 +1,10 @@
+Features:
+note
+rhythm
+parallel_error
+harmonic_quality
+S_directed_interval
+A_directed_interval
+T_directed_interval
+B_directed_interval
+repeated_sequence_2
