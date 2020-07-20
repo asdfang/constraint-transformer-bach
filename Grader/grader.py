@@ -5,6 +5,7 @@ class for grading a given chorale compared to Bach chorales
 from collections import defaultdict
 from music21 import converter
 from scipy.stats import wasserstein_distance
+from scipy.spatial.distance import jensenshannon
 from tqdm import tqdm
 from sklearn.mixture import GaussianMixture
 import pickle
@@ -16,13 +17,13 @@ from transformer_bach.utils import ensure_dir
 from Grader.distribution_helpers import histogram_to_distribution, distributions_to_wasserstein_inputs
 from Grader.compute_chorale_histograms import get_note_histogram, get_harmonic_quality_histogram, get_SATB_interval_histogram, get_interval_histogram, \
     get_harmonic_quality_histogram, get_rhythm_histogram, get_error_histogram, get_parallel_error_histogram, get_repeated_sequence_histogram, \
-    get_repeated_sequence_histogram_1, get_repeated_sequence_histogram_2, get_self_similarity_histogram
+    get_repeated_sequence_histogram
 from Grader.find_self_similarity import BINS
 
 
 FEATURES = ['note', 'rhythm', 'parallel_error', 'harmonic_quality',
-            'S_directed_interval', 'A_directed_interval', 'T_directed_interval', 'B_directed_interval',
-            'repeated_sequence_2']
+            'S_directed_interval', 'A_directed_interval', 'T_directed_interval', 'B_directed_interval', 
+            'repeated_sequence']
 
 POSSIBLE_FEATURES = ['note', 'rhythm', 'parallel_error', 'error', 'harmonic_quality',
                      'directed_interval', 'S_directed_interval', 'A_directed_interval', 'T_directed_interval', 'B_directed_interval',
@@ -31,10 +32,12 @@ POSSIBLE_FEATURES = ['note', 'rhythm', 'parallel_error', 'error', 'harmonic_qual
                      'B_repeated_sequence', 'self_similarity']
 
 class Grader:         
-    def __init__(self, features, iterator, pickle_dir=None):
+    def __init__(self, features, iterator=None, pickle_dir=None):
         """
-        :param features: a list of features to use in grading
-        :param iterator: an iterator of chorales to grade against
+        Arguments:
+            features: list of features to use in grading function
+            iterator: an iterator of chorales to grade against (most likely Bach)
+            pickle_dir: a folder containing pickles, or the folder to save pickles in if it does not exist
         """
         self.features = features
         self.iterator = iterator
@@ -54,8 +57,6 @@ class Grader:
         except:     # catch grading function failures
             return float('inf'), []
         
-        # gm = self.gaussian
-        # grade = gm.score([chorale_vector])
         grade = np.sum(chorale_vector)
         return grade, chorale_vector
     
@@ -491,25 +492,8 @@ class Grader:
 
         return wasserstein_distance(u, v, u_weights, v_weights)
     
-    def get_repeated_sequence_1_grade(self, chorale):
-        sh = get_repeated_sequence_histogram_1(chorale)
-        chorale_distribution = histogram_to_distribution(sh)
-        dataset_distribution = self.distributions['repeated_sequence_1_distribution']
-        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # longest sequence, in ticks
-        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
-
-        # populate chorale_list at the indices corresponding to keys in chorale_distribution
-        for seq_len in chorale_distribution:
-            chorale_list[seq_len] = chorale_distribution[seq_len]
-        
-        for seq_len in dataset_distribution:
-            dataset_list[seq_len] = dataset_distribution[seq_len]
-
-        vals = [i for i in range(len(chorale_list))]
-        return wasserstein_distance(vals, vals, chorale_list, dataset_list)
-    
-    def get_repeated_sequence_2_grade(self, chorale):
-        sh = get_repeated_sequence_histogram_2(chorale)
+    def get_repeated_sequence_grade(self, chorale):
+        sh = get_repeated_sequence_histogram(chorale)
         chorale_distribution = histogram_to_distribution(sh)
         dataset_distribution = self.distributions['repeated_sequence_2_distribution']
         max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
@@ -525,87 +509,5 @@ class Grader:
         if np.sum(chorale_list) == 0:
             chorale_list[0] = 1
         
-        vals = [i for i in range(len(chorale_list))]
-        return wasserstein_distance(vals, vals, chorale_list, dataset_list)
-
-    def get_S_repeated_sequence_grade(self, chorale):
-        sh = get_repeated_sequence_histogram(chorale, voice=0)
-        chorale_distribution = histogram_to_distribution(sh)
-        dataset_distribution = self.distributions['S_repeated_sequence_distribution']
-        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
-        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
-
-        # populate chorale_list at the indices corresponding to keys in chorale_distribution
-        for seq_len in chorale_distribution:
-            chorale_list[seq_len] = chorale_distribution[seq_len]
-        
-        for seq_len in dataset_distribution:
-            dataset_list[seq_len] = dataset_distribution[seq_len]
-
-        vals = [i for i in range(len(chorale_list))]
-        return wasserstein_distance(vals, vals, chorale_list, dataset_list)
-    
-    def get_A_repeated_sequence_grade(self, chorale):
-        sh = get_repeated_sequence_histogram(chorale, voice=1)
-        chorale_distribution = histogram_to_distribution(sh)
-        dataset_distribution = self.distributions['A_repeated_sequence_distribution']
-        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
-        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
-
-        # populate chorale_list at the indices corresponding to keys in chorale_distribution
-        for seq_len in chorale_distribution:
-            chorale_list[seq_len] = chorale_distribution[seq_len]
-        
-        for seq_len in dataset_distribution:
-            dataset_list[seq_len] = dataset_distribution[seq_len]
-
-        vals = [i for i in range(len(chorale_list))]
-        return wasserstein_distance(vals, vals, chorale_list, dataset_list)
-    
-    def get_T_repeated_sequence_grade(self, chorale):
-        sh = get_repeated_sequence_histogram(chorale, voice=2)
-        chorale_distribution = histogram_to_distribution(sh)
-        dataset_distribution = self.distributions['T_repeated_sequence_distribution']
-        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
-        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
-
-        # populate chorale_list at the indices corresponding to keys in chorale_distribution
-        for seq_len in chorale_distribution:
-            chorale_list[seq_len] = chorale_distribution[seq_len]
-        
-        for seq_len in dataset_distribution:
-            dataset_list[seq_len] = dataset_distribution[seq_len]
-
-        vals = [i for i in range(len(chorale_list))]
-        return wasserstein_distance(vals, vals, chorale_list, dataset_list)
-    
-    def get_B_repeated_sequence_grade(self, chorale):
-        sh = get_repeated_sequence_histogram(chorale, voice=3)
-        chorale_distribution = histogram_to_distribution(sh)
-        dataset_distribution = self.distributions['B_repeated_sequence_distribution']
-        max_seq = np.max(list(chorale_distribution.keys()) + list(dataset_distribution.keys())) # in ticks
-        chorale_list, dataset_list = [0] * (max_seq + 1), [0] * (max_seq + 1)
-
-        # populate chorale_list at the indices corresponding to keys in chorale_distribution
-        for seq_len in chorale_distribution:
-            chorale_list[seq_len] = chorale_distribution[seq_len]
-        
-        for seq_len in dataset_distribution:
-            dataset_list[seq_len] = dataset_distribution[seq_len]
-
-        vals = [i for i in range(len(chorale_list))]
-        return wasserstein_distance(vals, vals, chorale_list, dataset_list)
-
-    def get_self_similarity_grade(self, chorale):
-        ssh = get_self_similarity_histogram(chorale)
-        chorale_distribution = histogram_to_distribution(ssh)
-        dataset_distribution = self.distributions['self_similarity_distribution']
-        assert len(chorale_distribution.keys()) == len(dataset_distribution.keys())
-        chorale_list, dataset_list = [0] * len(chorale_distribution), [0] * len(chorale_distribution)
-        
-        for i, b in enumerate(BINS[:-1]):
-            chorale_list[i] = chorale_distribution[b]
-            dataset_list[i] = dataset_distribution[b]
-
         vals = [i for i in range(len(chorale_list))]
         return wasserstein_distance(vals, vals, chorale_list, dataset_list)

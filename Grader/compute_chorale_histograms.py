@@ -8,8 +8,7 @@ import numpy as np
 import time
 
 from Grader.voice_leading_helpers import *
-from Grader.find_repeated_sequences_1 import get_correlative_matrix_1, get_candidate_set_1, candidate_set_to_repeated_sequence_histogram_1
-from Grader.find_repeated_sequences_2 import get_correlative_matrix_2, get_candidate_set_2, candidate_set_to_repeated_sequence_histogram_2
+from Grader.find_repeated_sequences import get_correlative_matrix, get_candidate_set, candidate_set_to_repeated_sequence_histogram
 from Grader.find_self_similarity import get_self_similarity, BINS
 from transformer_bach.constraint_helpers import score_to_hold_representation, score_to_midi_tick_representation
 
@@ -148,69 +147,22 @@ def get_parallel_error_histogram(chorale):
 
     # initialize counts to 0
     error_histogram = Counter()
-    error_histogram += find_parallel_8ve_5th_errors(chorale)
+    error_histogram += find_parallel_8ve_5th_errors(chorale)[0]
     error_histogram.update({error: 0 for error in possible_errors})  # doesn't over-write
 
     return error_histogram
 
-def get_repeated_sequence_histogram_1(chorale):
-    """
-    sequence must have exact match in all four voices
-    """
-    chorale = np.array(score_to_hold_representation(chorale))
-    transposed_chorale = chorale.T.tolist()
-    A = get_correlative_matrix_1(transposed_chorale)
-    candidate_set = get_candidate_set_1(A, transposed_chorale)
-    repeated_sequence_histogram = candidate_set_to_repeated_sequence_histogram_1(candidate_set)
-    return repeated_sequence_histogram
-
-def get_repeated_sequence_histogram_2(chorale):
+def get_repeated_sequence_histogram(chorale):
     """
     sequences are calculated for each voice, and summer across voices
     """
-    start_time = time.time()
     chorale = np.array(score_to_hold_representation(chorale))
 
     all_voices_candidate_set = defaultdict(lambda: [0,0])
     for part_idx in range(4):
         voice = list(chorale[part_idx])
-        a_time = time.time()
-        A = get_correlative_matrix_2(voice)
-        b_time = time.time()
-        candidate_set = get_candidate_set_2(A, voice)
-        c_time = time.time()
+        A = get_correlative_matrix(voice)
+        candidate_set = get_candidate_set(A, voice)
         all_voices_candidate_set.update(candidate_set)
-    d_time = time.time()
-    repeated_sequence_histogram = candidate_set_to_repeated_sequence_histogram_2(all_voices_candidate_set)
+    repeated_sequence_histogram = candidate_set_to_repeated_sequence_histogram(all_voices_candidate_set)
     return repeated_sequence_histogram
-
-
-def get_repeated_sequence_histogram(chorale, voice=0):
-    """
-    sequence calculated for the given voice
-    """
-    chorale = np.array(score_to_hold_representation(chorale))
-
-    part = list(chorale[voice])
-    A = get_correlative_matrix_2(part)
-    candidate_set = get_candidate_set_2(A, part)
-    repeated_sequence_histogram = candidate_set_to_repeated_sequence_histogram_2(candidate_set)
-
-    return repeated_sequence_histogram
-
-
-def get_self_similarity_histogram(chorale):
-    """
-    Arguments:
-        chorale: a music21 chorale
-
-    Returns a histogram, with key as lower bound of bin, bins of size 0.05. Keys range [0.0, 4.0]
-    """
-    chorale_mt = score_to_midi_tick_representation(chorale)
-    acorr = get_self_similarity(chorale_mt)
-    self_similarity_ndarray, _ = np.histogram(acorr, bins=BINS)
-    self_similarity_histogram = Counter()
-    for i, b in enumerate(BINS[:-1]):
-        self_similarity_histogram[b] = self_similarity_ndarray[i]
-        
-    return self_similarity_histogram

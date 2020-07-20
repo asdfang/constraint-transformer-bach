@@ -18,7 +18,6 @@ def has_fermata(note_or_rest):
     return False
 
 
-# TODO for Alex: provide verbose version that tells where the error is (voice, measure, beat)
 def find_voice_leading_errors(chorale):
     """
     Arguments
@@ -74,11 +73,13 @@ def find_parallel_8ve_5th_errors(chorale):
     Arguments
         chorale: a music21 Stream object; must have 4 parts
 
-    Returns how many parallel octave and fifth errors there are. Parallel octave and fifths ignored if first notes have fermata.
-        Counter
+    Returns how many parallel octave and fifth errors there are in a Counter, and where they are in a list of error tuples.
+    Error tuple in the following format: (type of error, 2-tuple designated which voices, offset at which error occurs, and string describing the error)
+    Parallel octave and fifths ignored if first notes have fermata.
+        Returns: (Counter, list of error tuples)
     """
-
     error_histogram = Counter()
+    errors = []
     for top_idx in range(0, 3):
         for bottom_idx in range(top_idx + 1, 4):
             top = chorale.parts[top_idx].flat.notes
@@ -107,14 +108,19 @@ def find_parallel_8ve_5th_errors(chorale):
 
                 # find voice leading mistakes!
                 vlq = music21.voiceLeading.VoiceLeadingQuartet(top_n1, top_n2, bottom_n1, bottom_n2)
-
                 if (has_fermata(top_n1) or has_fermata(bottom_n1)) == False:
                     if vlq.parallelUnisonOrOctave():
                         error_histogram['Prl-8ve'] += 1
+                        error_tuple = ('P8/P1', (top_idx, bottom_idx), top_n1.offset, f'P8 or P1 between voice {top_idx} and {bottom_idx} at offset {top_n1.offset}')
+                        if error_tuple not in errors:
+                            errors.append(error_tuple)
                     if vlq.parallelFifth():
                         error_histogram['Prl-5th'] += 1
+                        error_tuple = ('P5', (top_idx, bottom_idx), top_n1.offset, f'P5 between voice {top_idx} and {bottom_idx} at offset {top_n1.offset}')
+                        if error_tuple not in errors:
+                            errors.append(error_tuple)
 
-    return error_histogram
+    return error_histogram, errors
 
 
 def find_voice_crossing_and_spacing_errors(chorale):
