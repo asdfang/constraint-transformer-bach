@@ -161,13 +161,15 @@ class TransformerBach(nn.Module):
         torch.save(self.state_dict(), f'{model_dir}/decoder')
         # print(f'Model {self.__repr__()} saved')
 
-    def load(self, early_stopped):
+    def load(self, early_stopped=None, epoch=None):
         print(f'Loading models {self.__repr__()}')
         if early_stopped:
             model_dir = f'{self.model_dir}/early_stopped'
-        else:
+        elif early_stopped is False:
             model_dir = f'{self.model_dir}/overfitted'
-
+        
+        if epoch:
+            model_dir = f'{self.model_dir}/checkpoints/epoch-{epoch}'
         #  Deal with older configs
         if not os.path.exists(model_dir):
             model_dir = self.model_dir

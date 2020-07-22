@@ -2,7 +2,7 @@ from pathlib import Path
 
 config = {
     'dataset':                     'bach',
-    'random_seed':                  0,
+    'random_seed':                  22,
 
     # --- Dataloader ---
     'dataloader_generator_kwargs': dict(
@@ -36,14 +36,7 @@ config = {
 
     # ======== model ID ========
     'timestamp':                   None,
-    'savename':                    'aug-gen',
-    'description':                 'changing top_p back to 0.8',
-
-    # ======== Training ========
-    # 'num_epochs':                  50,
-    # 'lr':                          1e-5,
-    # 'batch_size':                  8,
-    # 'num_batches':                 2048,
+    'savename':                    None,
 
     # ======== Augmentative Generation ========
     'num_epochs':                  40,
@@ -51,4 +44,10 @@ config = {
     'lr':                          1e-5,
     'batch_size':                  8,
     'num_batches':                 2048,
+
+    # ======== Training ========
+    # 'num_epochs':                  40,
+    # 'lr':                          1e-5,
+    # 'batch_size':                  8,
+    # 'num_batches':                 2048,
 }

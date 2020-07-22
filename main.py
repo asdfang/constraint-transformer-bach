@@ -18,13 +18,9 @@ from transformer_bach.small_bach_dataloader import SmallBachDataloaderGenerator
 from transformer_bach.decoder_relative import TransformerBach
 from transformer_bach.getters import get_data_processor
 from transformer_bach.melodies import MARIO_MELODY, TETRIS_MELODY, LONG_TETRIS_MELODY
-from transformer_bach.utils import ensure_dir, seed
+from transformer_bach.utils import ensure_dir, seed, parse_xml
 from transformer_bach.DatasetManager.chorale_dataset import ChoraleBeatsDataset
 from transformer_bach.DatasetManager.dataset_manager import DatasetManager
-from experiments.update_model import augmentative_generation
-from experiments.generate_and_grade import grade_bach, grade_constrained_mock, grade_unconstrained_mock
-from Grader.grader import Grader, FEATURES
-from Grader.helpers import get_threshold
 
 
 @click.command()
@@ -38,7 +34,10 @@ from Grader.helpers import get_threshold
               help='generate from the given model')
 @click.option('--overfitted', is_flag=True, 
               help='whether to load the overfitted model')
+@click.option('--epoch', type=int, default=None,
+              help='the epoch of the trained model to load')
 @click.option('--config', type=click.Path(exists=True))
+@click.option('--description', type=str, default='')
 @click.option('--num_workers', type=int, default=0)
 def main(train,
          load,
@@ -46,7 +45,9 @@ def main(train,
          base,
          generate,
          overfitted,
+         epoch,
          config,
+         description,
          num_workers,
          ):
     # Use all gpus available
@@ -57,8 +58,13 @@ def main(train,
     config_path = config
     config_module_name = os.path.splitext(config)[0].replace('/', '.')
     config = importlib.import_module(config_module_name).config
+    
+    from experiments.augmentative_generation import augmentative_generation
+    from experiments.generate_and_grade import grade_folder, grade_constrained_mock, grade_unconstrained_mock
+    from Grader.grader import Grader, FEATURES
+    from Grader.helpers import get_threshold
 
-    # set random seed
+    # set random seed 
     seed(config['random_seed'])
     
     # compute time stamp
@@ -67,15 +73,23 @@ def main(train,
     else:
         timestamp = datetime.now().strftime('%m-%d_%H:%M')
         config['timestamp'] = timestamp
-
+    
     # set model_dir
     if load:
         model_dir = os.path.dirname(config_path)
     else:
+        if config['savename'] is None:
+            if aug_gen:
+                config['savename'] = 'aug-gen'
+            elif base:
+                config['savename'] = 'base'
+            else:
+                config['savename'] = 'model'
         model_dir = f'models/{config["savename"]}_{timestamp}'
 
     # === Decoder ====
-    bach_dataset = [chorale for chorale in music21.corpus.chorales.Iterator() if len(chorale.parts) == 4] # checking if valid
+    print('Parsing XML Bach dataset')
+    bach_dataset = [parse_xml(f'chorales/bach_chorales/{i}.xml') for i in tqdm(range(351))]
     num_examples = len(bach_dataset)
     split = [0.8, 0.2]
     train_dataset = bach_dataset[:int(split[0] * num_examples)]
@@ -83,14 +97,14 @@ def main(train,
     dataloader_generator_kwargs = config['dataloader_generator_kwargs']
 
     train_dataloader_generator = SmallBachDataloaderGenerator(
-        dataset_name='bach_train_for_aug_gen',
+        dataset_name='bach_train',
         chorales=train_dataset,
         include_transpositions=dataloader_generator_kwargs['include_transpositions'],
         sequences_size=dataloader_generator_kwargs['sequences_size'],
     )
 
     val_dataloader_generator = SmallBachDataloaderGenerator(
-        dataset_name='bach_val_for_aug_gen',
+        dataset_name='bach_val',
         chorales=val_dataset,
         include_transpositions=dataloader_generator_kwargs['include_transpositions'],
         sequences_size=dataloader_generator_kwargs['sequences_size'],
@@ -126,6 +140,8 @@ def main(train,
     if load:
         if overfitted:
             transformer.load(early_stopped=False)
+        elif epoch:
+            transformer.load(epoch=epoch)
         else:
             transformer.load(early_stopped=True)
         transformer.to('cuda')
@@ -137,7 +153,7 @@ def main(train,
         transformer.to('cuda')
 
         with open(f'{model_dir}/README.txt', 'w') as readme:
-            readme.write(config['description'])
+            readme.write(description)
             readme.close()
     
     grader = Grader(
@@ -147,22 +163,27 @@ def main(train,
 
     if train:        
         transformer.train_model(
-                batch_size=config['batch_size'],
-                num_batches=config['num_batches'],
-                num_epochs=config['num_epochs'],
-                lr=config['lr'],
-                plot=True,
-                num_workers=num_workers
-            )
+            batch_size=config['batch_size'],
+            num_batches=config['num_batches'],
+            num_epochs=config['num_epochs'],
+            lr=config['lr'],
+            plot=True,
+            num_workers=num_workers,
+        )
 
     if aug_gen:
-        # method 4: update on generations, with threshold of median Bach chorale grade
+        threshold = get_threshold(
+            data_file='experiments/ablations/reg_pe_no_oe/bach_grades.csv',
+            column='grade',
+            aggregate='75p',
+        )
         augmentative_generation(
             transformer=transformer, 
             grader=grader,
             config=config,
             num_workers=num_workers,
             bach_iterator=train_dataset,
+            threshold=threshold,
         )
 
     if base:
@@ -177,14 +198,11 @@ def main(train,
         )
     
     if generate:
-        # grade_unconstrained_mock(transformer=transformer, 
-        #                          grader=grader, 
-        #                          num_generations=351)
-        
-        grade_constrained_mock(
-            transformer=transformer,
+        grade_unconstrained_mock(
             grader=grader,
-            bach_iterator=bach_dataset[:5],
+            transformer=transformer, 
+            output_dir=f'{transformer.model_dir}/351_mocks',
+            num_generations=351,
         )
 
 
