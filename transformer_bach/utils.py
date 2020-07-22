@@ -8,7 +8,7 @@ from torch import nn
 import random
 from torch.distributions import Normal, kl_divergence
 import pickle
-
+import music21
 
 def cuda_variable(tensor):
     if torch.cuda.is_available():
@@ -171,3 +171,17 @@ def seed(random_seed, set_cudnn=False):
     if set_cudnn:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
+
+def parse_xml(chorale_path):
+    """
+    Arguments:
+        chorale_path: path to chorale, hopefully as a .xml file.
+
+    Returns a music21 stream with ties stripped. Measures are retained since this is a Score object.
+    """
+    assert chorale_path[-3:] == 'xml', 'Not reading an xml file. Transition to use xml!'
+    chorale = music21.converter.parse(chorale_path)
+    stripped_chorale = chorale.stripTies(retainContainers=False)
+
+    return stripped_chorale

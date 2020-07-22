@@ -10,7 +10,7 @@ import time
 from Grader.voice_leading_helpers import *
 from Grader.find_repeated_sequences import get_correlative_matrix, get_candidate_set, candidate_set_to_repeated_sequence_histogram
 from Grader.find_self_similarity import get_self_similarity, BINS
-from transformer_bach.constraint_helpers import score_to_hold_representation, score_to_midi_tick_representation
+from transformer_bach.constraint_helpers import score_to_hold_representation
 
 
 def get_note_histogram(chorale, key):
