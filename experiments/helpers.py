@@ -33,7 +33,7 @@ def read_training_data(data_file, feature='grade', threshold=None):
     for it in range(num_epochs+1):
         grades = df.loc[df['epoch'] == it][feature]
         if threshold:
-            grades = [x for x in grades if x > threshold]
+            grades = [x for x in grades if x < threshold]
         data_dict[it] = grades
     
     return data_dict
