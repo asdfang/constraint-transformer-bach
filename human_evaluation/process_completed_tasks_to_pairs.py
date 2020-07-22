@@ -6,9 +6,9 @@ from helpers import CSV, IDX_TO_COMPARISON
 
 tasks_df = pd.read_csv(CSV['tasks'])
 completed_tasks_df = pd.read_csv(CSV['completed_tasks'])
-
 pairs_df_dict = {}
 completed_pairs_df_dict = {}
+
 common_columns = ['task_id', 'question_id', 'background', 'pair_id']
 for x in ['a', 'b', 'c', 'd']:
     pairs_df_dict[x] = pd.read_csv(CSV[f'{x}_pairs'])
@@ -22,6 +22,9 @@ for i, task_row in completed_tasks_df.iterrows():
         pick = task_row[f'q{question_id}']
         pair_id = tasks_df.at[task_id, f'q{question_id}']
         comparison_idx = pair_id.split('_')[0]       # comparison type
+        # if someone was not listening, we do not write the results to completed pairs for comparisons a,b,c
+        # if comparison_idx != 'd' and task_row['listening'] is False:
+            # continue
         pair_row = pairs_df_dict[comparison_idx].iloc[int(pair_id.split('_')[1])]
         labels = IDX_TO_COMPARISON[comparison_idx]
         key = task_row[f'{labels[0]}_is{question_id}']

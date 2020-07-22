@@ -26,18 +26,15 @@ CSV = {
     'c_pairs': 'human_evaluation/data/aug-gen_base_pairs.csv',
     'd_pairs': 'human_evaluation/data/bach_bad_pairs.csv',
     'completed_tasks': 'human_evaluation/data/completed_tasks.csv',
+    'waveform_completions': 'human_evaluation/data/waveform_completions.csv',
     'completed_a_pairs': 'human_evaluation/data/completed_aug-gen_bach_pairs.csv',
     'completed_b_pairs': 'human_evaluation/data/completed_base_bach_pairs.csv',
     'completed_c_pairs': 'human_evaluation/data/completed_aug-gen_base_pairs.csv',
     'completed_d_pairs': 'human_evaluation/data/completed_bad_bach_pairs.csv',
+    'new_completed_pairs': 'human_evaluation/new_grades_data/completed_pairs.csv',
 }
 
 AUDIO_DIRS = {
-    # 'bach': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["bach"]}/',
-    # 'aug-gen': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["aug-gen"]}/',
-    # 'base': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["base"]}/',
-    # 'bad': f'http://cortex.cs.northwestern.edu:8200/static/audio/{MODEL_TO_IDX["bad"]}/',
-    # 'pretest': 'http://cortex.cs.northwestern.edu:8200/static/audio/pretest/',
     'bach': f'/upload/audio/{MODEL_TO_IDX["bach"]}/',
     'aug-gen': f'/upload/audio/{MODEL_TO_IDX["aug-gen"]}/',
     'base': f'/upload/audio/{MODEL_TO_IDX["base"]}/',

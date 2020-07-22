@@ -26,10 +26,10 @@ from itertools import combinations
 
 from helpers import NUM_TASKS, CSV, is_midi, IDX_TO_COMPARISON
 
-BACH_DIR = 'chorales/cleaned_bach_chorales'
-BASE_DIR = 'models/base_05-10_07:20/unconstrained_mocks_s1'
-AUG_GEN_DIR = 'models/aug-gen_05-09_06:09/unconstrained_mocks_s1'
-BAD_DIR = 'models/base_05-10_07:20/generations/1/'
+BACH_DIR = 'chorales/50_bach_chorales'
+BASE_DIR = 'models/base_05-10_07:20/generations/18'
+AUG_GEN_DIR = 'models/aug-gen_05-09_06:09/generations/18'
+BAD_DIR = 'models/base_05-10_07:20/generations/1'
 
 
 def main():
@@ -48,10 +48,10 @@ def make_tasks():
 
     for task_id in range(NUM_TASKS):
         # select pairs of each type
-        a_pairs = [f'a_{idx}' for idx in random.choice(range(351), 3)]
-        b_pairs = [f'b_{idx}' for idx in random.choice(range(351), 3)]
-        c_pairs = [f'c_{idx}' for idx in random.choice(range(351), 3)]
-        d_pair = f'd_{random.choice(range(351))}'
+        a_pairs = [f'a_{idx}' for idx in random.choice(range(50), 3)]
+        b_pairs = [f'b_{idx}' for idx in random.choice(range(50), 3)]
+        c_pairs = [f'c_{idx}' for idx in random.choice(range(50), 3)]
+        d_pair = f'd_{random.choice(range(50))}'
         # order the pairs
         d_pos = random.choice(range(3,6))
         part1 = a_pairs + b_pairs
@@ -63,7 +63,7 @@ def make_tasks():
 
     with open(CSV['tasks'], 'w') as fo:
         writer = csv.writer(fo)
-        writer.writerow(['task_id','1','2','3','4','5','6','7','8','9','10'])
+        writer.writerow(['task_id','q1','q2','q3','q4','q5','q6','q7','q8','q9','q10'])
         writer.writerows(tasks)
 
 
@@ -81,9 +81,9 @@ def make_pairs(dirs):
                    f'{label1}_grade', f'{label2}_grade',
                    f'{label1}_is', f'{label2}_is']
         pairs_df = pd.DataFrame(columns=columns)
-        # randomly order ids 
-        ids1 = [i for i in range(351)]
-        ids2 = [i for i in range(351)]
+        # randomly order ids
+        ids1 = [i for i in range(50)]
+        ids2 = [i for i in range(50)]
         random.shuffle(ids1)
         random.shuffle(ids2)
         # read grades as dataframe

@@ -89,10 +89,9 @@ for index, task_row in tqdm(tasks.iterrows()): # for each task
     task_json['id'] = task_id
     task_json['data'] = data
     all_tasks_json[str(task_id)] = task_json
-    break
 
-# with open('human_evaluation/data/tasks.json', 'w') as f:
-#     # s = json.dumps(all_tasks_json, indent=4)
-#     s = json.dumps(all_tasks_json)
-#     f.write(s)
-#     f.close()
+with open('human_evaluation/data/tasks.json', 'w') as f:
+    # s = json.dumps(all_tasks_json, indent=4)
+    s = json.dumps(all_tasks_json)
+    f.write(s)
+    f.close()
