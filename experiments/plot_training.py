@@ -68,25 +68,32 @@ def plot_boxplot_per_epoch(data_file='results/update_grades_over_bach_chorales.c
     # plot
     plt.figure()
     plt.style.use('seaborn-whitegrid')
-    fig, ax = plt.subplots(figsize=(8,6))
+    plt.rc('xtick', labelsize=11)
+    plt.rc('ytick', labelsize=11)
+    plt.rc('axes', titlesize=13)
+    fig, ax = plt.subplots(figsize=(8,5))
     ax.xaxis.grid(False)
     ax.boxplot(list(data_dict.values()))
     ax.set_xticks([i+1 for i in data_dict.keys()])
     ax.set_xticklabels([str(i) for i in data_dict.keys()])
     for label in ax.get_xaxis().get_ticklabels()[1::2]:
         label.set_visible(False)
+    ylabel0 = ax.get_yaxis().get_ticklabels()[0]
+    ylabel0.set_visible(False)
     plt.xlabel('Epoch')
-    plt.title(f'{feature.capitalize()} Distribution of Generations During Training')
+    plt.title(f'{feature.capitalize()} Distribution of Generations During Aug-Gen Training')
+    plt.text(-2.2, 1, 'better')
+    plt.text(-2.2, 47, 'worse')
     plt.ylabel(feature.capitalize())
-    plt.ylim([None, 50])
+    plt.ylim([0, 49.15])
     
     threshold = get_threshold(
-        data_file='experiments/ablations/reg_pe_no_oe/sum_bach_grades.csv',
+        data_file='experiments/ablations/reg_pe_no_oe/bach_grades.csv',
         column='grade',
-        aggregate='median',
+        aggregate='75p',
     )
-    plt.axhline(y=threshold, color='steelblue', linestyle='-.', label='Median Bach chorale grade')
-    plt.legend(loc='lower right')
+    plt.axhline(y=threshold, color='steelblue', linestyle='-.', label=r'$Q_3$' + ' of Bach grades')
+    plt.legend(loc='upper right')
 
     ensure_dir(plt_dir)
     fig.tight_layout()
@@ -124,7 +131,7 @@ def plot_selections_per_epoch(data_file='results/update_grades_over_bach_chorale
     plot number of selections each epoch
     """
     thres = get_threshold(
-        data_file='experiments/ablations/reg_pe_no_oe/sum_bach_grades.csv',
+        data_file='experiments/ablations/reg_pe_no_oe/bach_grades.csv',
         column='grade',
         aggregate='75p',
     )
@@ -183,29 +190,33 @@ def plot_dataset_sizes_per_epoch(data_file, plt_dir):
     ax.xaxis.grid(False)
     bach = plt.bar(ind, bach_examples, color='steelblue')
     mock = plt.bar(ind, mock_examples, bottom=bach_examples, color='lightgray')
-    plt.xticks(ind)
-    for label in ax.get_xaxis().get_ticklabels()[::2]:
+    ax.set_xticks([i+1 for i in range(num_epochs)])
+    ax.set_xticklabels([str(i) for i in range(num_epochs)])
+    for label in ax.get_xaxis().get_ticklabels()[1::2]:
         label.set_visible(False)
     plt.xlabel('Epoch')
     plt.ylabel('Number of examples')
     plt.legend((bach[0], mock[0]), ('Bach', 'Generated'))
     plt.title('Number of Bach and Generated Examples in Training Dataset')
+    fig.tight_layout()
     plt.savefig(os.path.join(plt_dir, 'num_examples_per_epoch.png'))
 
     # plot number of chorales in train dataset
     plt.figure()
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6.4,4))
     plt.style.use('seaborn-whitegrid')
     ax.xaxis.grid(False)
     bach = plt.bar(ind, bach_chorales, color='steelblue')
     mock = plt.bar(ind, mock_chorales, bottom=bach_chorales, color='lightgray')
-    plt.xticks(ind)
-    for label in ax.get_xaxis().get_ticklabels()[::2]:
+    ax.set_xticks([i+1 for i in range(num_epochs)])
+    ax.set_xticklabels([str(i) for i in range(num_epochs)])
+    for label in ax.get_xaxis().get_ticklabels()[1::2]:
         label.set_visible(False)
     plt.xlabel('Epoch')
     plt.ylabel('Number of chorales')
     plt.legend((bach[0], mock[0]), ('Bach', 'Generated'))
     plt.title('Number of Bach and Generated Chorales in Training Dataset')
+    fig.tight_layout()
     plt.savefig(os.path.join(plt_dir, 'num_chorales_per_epoch.png'))
 
 
