@@ -58,7 +58,7 @@ def augmentative_generation(transformer,
     print(f'Selection threshold: {threshold}')
 
     # initialize grades_seen
-    with open('chorales/cleaned_bach_chorales/grades.csv', 'r') as fin:
+    with open('chorales/bach_chorales/grades.csv', 'r') as fin:
         bach_df = pd.read_csv(fin)
         bach_grades = list(bach_df['grade'])
     grades_seen = bach_grades

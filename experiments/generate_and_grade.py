@@ -97,22 +97,15 @@ def grade_unconstrained_mock(grader,
 
 def grade_constrained_mock(grader,
                            transformer,
-                           output_dir=None,
                            bach_iterator=None,
+                           output_dir=None,
+                           num_generations=1,
                            ):
     """
     Arguments:
         grader: Grader object
         transformer: model for generation
-        grades_csv: csv file to write grades to
         bach_iterator: iterator containing Bach chorales
-    
-    Usage example:
-        grade_constrained_mock(grader=grader,
-                               transformer=transformer,
-                               grades_csv='results/tmp.csv',
-                               bach_iterator=islice(bach_dataloader_generator.dataset.iterator_gen(), 1),
-                               output_dir='chorales/testing/')
     """
     print('Generating and grading constrained mock chorales')
     mock_grades = []
@@ -140,6 +133,9 @@ def grade_constrained_mock(grader,
         # grade chorale
         grade, chorale_vector = grader.grade_chorale(mock_score)
         mock_grades.append([grade, *chorale_vector])
+
+        if i >= num_generations:
+            break
 
     print('Writing data to csv file')
     with open(f'{output_dir}/grades.csv', 'w') as chorale_file:

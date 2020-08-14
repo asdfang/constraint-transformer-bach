@@ -198,12 +198,20 @@ def main(train,
         )
     
     if generate:
-        grade_unconstrained_mock(
+        grade_constrained_mock(
             grader=grader,
             transformer=transformer, 
-            output_dir=f'{transformer.model_dir}/351_mocks',
-            num_generations=351,
+            output_dir=f'{transformer.model_dir}/constrained_mocks',
+            bach_iterator=bach_dataset,
+            num_generations=1,
         )
+
+        #grade_unconstrained_mock(
+        #    grader=grader,
+        #    transformer=transformer,
+        #    output_dir=f'{transformer.model_dir}/test',
+        #    num_generations=1,
+        #)
 
 
 if __name__ == '__main__':

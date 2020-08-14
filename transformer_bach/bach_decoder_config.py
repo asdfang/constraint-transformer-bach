@@ -36,7 +36,7 @@ config = {
 
     # ======== model ID ========
     'timestamp':                   None,
-    'savename':                    None,
+    'savename':                    'aug-gen',
 
     # ======== Augmentative Generation ========
     'num_epochs':                  40,

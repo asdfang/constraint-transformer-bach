@@ -18,7 +18,6 @@ from Grader.distribution_helpers import histogram_to_distribution, distributions
 from Grader.compute_chorale_histograms import get_note_histogram, get_harmonic_quality_histogram, get_SATB_interval_histogram, get_interval_histogram, \
     get_harmonic_quality_histogram, get_rhythm_histogram, get_error_histogram, get_parallel_error_histogram, get_repeated_sequence_histogram, \
     get_repeated_sequence_histogram
-from Grader.find_self_similarity import BINS
 
 
 FEATURES = ['note', 'rhythm', 'parallel_error', 'harmonic_quality',
